@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Nokia Cellphone FC", monospace;
+}
+
+@font-face {
+  font-family: 'Nokia Cellphone FC';
+  src: url('/nokiafc22.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* Vintage Windows 95 cursor (base64 encoded small arrow) */
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path d="M0,0 v14 l4,-4 l3,5 l2,-1 l-3,-5 l5,0 z" fill="white" stroke="black" stroke-width="1"/></svg>'), auto;
+}
+
+@keyframes bootFade {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes bootScale {
+  0% { transform: scale(0.8); }
+  20% { transform: scale(1); }
+  80% { transform: scale(1.05); }
+  100% { transform: scale(1.5); }
+}
+
+.matrix-mode {
+  background-color: black !important;
+  color: #0f0 !important;
+  text-shadow: 0 0 5px #0f0;
+  transition: all 0.5s ease-in-out;
+}
+.matrix-mode * {
+  color: #0f0 !important;
+  border-color: #0f0 !important;
+}
