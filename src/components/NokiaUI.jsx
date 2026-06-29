@@ -7,6 +7,11 @@ export default function NokiaUI() {
   const [menuIdx, setMenuIdx] = useState(0)
   const [timeStr, setTimeStr] = useState('')
   
+  const [browserUrl, setBrowserUrl] = useState('')
+  const [dialNumber, setDialNumber] = useState('')
+
+  const lastInteractionRef = useRef(Date.now());
+
   // States for sub-apps
   const [activeItemIdx, setActiveItemIdx] = useState(0)
   const scrollRef = useRef(null)
@@ -177,6 +182,16 @@ export default function NokiaUI() {
     return () => clearInterval(t)
   }, [])
 
+  // Screensaver Logic
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (screen !== 'off' && screen !== 'boot' && screen !== 'screensaver' && (Date.now() - lastInteractionRef.current > 30000)) {
+        setScreen('screensaver');
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [screen]);
+
   // Snake Game Engine
   useEffect(() => {
     if (screen !== 'snake' || gameState !== 'PLAYING') return;
@@ -234,14 +249,38 @@ export default function NokiaUI() {
   }, [])
 
   const handleKeyDown = useCallback((e) => {
+    lastInteractionRef.current = Date.now();
+
     if (screen === 'off') {
       setScreen('boot');
+      return;
+    }
+
+    if (screen === 'screensaver') {
+      setScreen('idle');
       return;
     }
 
     // Only beep for printable characters or control keys we use
     if (e.key.length === 1 || ['Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace', 'Escape'].includes(e.key)) {
       playBeep();
+    }
+
+    if (screen === 'dialing') {
+      if (e.key === 'Escape' || e.key === 'Backspace') {
+        setDialNumber(prev => {
+          const next = prev.slice(0, -1);
+          if (next.length === 0) setScreen('idle');
+          return next;
+        });
+      } else if (e.key === 'Enter') {
+        window.open(`tel:${dialNumber}`, '_self');
+        setScreen('idle');
+        setDialNumber('');
+      } else if (/^[0-9*#]$/.test(e.key)) {
+        if (dialNumber.length < 15) setDialNumber(prev => prev + e.key);
+      }
+      return;
     }
 
     if (screen === 'terminal') {
@@ -263,6 +302,9 @@ export default function NokiaUI() {
       if (e.key === 'Enter') {
         setScreen('menu')
         setMenuIdx(0)
+      } else if (/^[0-9*#]$/.test(e.key)) {
+        setDialNumber(e.key);
+        setScreen('dialing');
       }
       return
     }
@@ -344,7 +386,7 @@ export default function NokiaUI() {
     }
 
     if (e.key === 'Escape' || e.key === 'Backspace') setScreen('idle')
-  }, [screen, menuIdx, activeItemIdx, handleOpenApp, gameState])
+  }, [screen, menuIdx, activeItemIdx, handleOpenApp, gameState, projects, dialNumber])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -386,7 +428,7 @@ export default function NokiaUI() {
       {/* Main Content Area flanked by vertical bars */}
       <div className="flex-1 flex flex-row overflow-hidden relative">
         {/* Left Vertical Signal Bar */}
-        {screen !== 'boot' && (
+        {screen !== 'boot' && screen !== 'screensaver' && (
           <div className="w-[6cqw] flex flex-col items-start py-[1cqw] justify-between h-full pl-[1.5cqw]">
             <div className="w-[3cqw] h-[3.5cqw] bg-[#1a2e0e]"></div>
             <div className="w-[2.2cqw] h-[3.5cqw] bg-[#1a2e0e]"></div>
@@ -577,21 +619,35 @@ export default function NokiaUI() {
         </div>
 
         {/* Right Vertical Battery Bar */}
-        {screen !== 'boot' && (
-          <div className="w-[6cqw] flex flex-col items-end py-[1cqw] justify-between h-full pr-[1cqw]">
+        {screen !== 'boot' && screen !== 'screensaver' && (
+          <div className="w-[6cqw] flex flex-col items-end py-[1cqw] justify-between h-full pr-[1.5cqw]">
             <div className="w-[3cqw] h-[3.5cqw] bg-[#1a2e0e]"></div>
             <div className="w-[2.2cqw] h-[3.5cqw] bg-[#1a2e0e]"></div>
             <div className="w-[1.5cqw] h-[3.5cqw] bg-[#1a2e0e]"></div>
             <div className="w-[0.8cqw] h-[3.5cqw] bg-[#1a2e0e]"></div>
-            <div className="flex flex-col items-center mt-[0.5cqw] mr-[-0.2cqw]">
-              {/* Battery Nub */}
-              <div className="w-[1.2cqw] h-[0.5cqw] bg-[#1a2e0e]"></div>
-              {/* Battery Body Outline */}
+            <div className="mt-[0.5cqw] -mr-[0.5cqw] flex items-center justify-center">
               <div className="w-[3cqw] h-[4.5cqw] border-[1.5px] border-[#1a2e0e]"></div>
             </div>
           </div>
         )}
       </div>
+
+      {screen === 'dialing' && (
+        <div className="w-full h-full flex items-center justify-center p-[2cqw]">
+          <div className="text-[5cqw] font-bold tracking-widest break-all text-center leading-tight">
+            {dialNumber}
+            <span className="animate-pulse">_</span>
+          </div>
+        </div>
+      )}
+
+      {screen === 'screensaver' && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="text-[6cqw] font-bold tracking-widest animate-[bounce_4s_ease-in-out_infinite_alternate]">
+            {timeStr}
+          </div>
+        </div>
+      )}
 
       {/* Soft keys */}
       <div className="flex justify-between px-[2cqw] py-[1cqw] border-t-[3px] border-[#1a2e0e] mt-1 text-[2cqw] font-bold">
@@ -609,6 +665,10 @@ export default function NokiaUI() {
               }
             } else if (screen === 'terminal') {
               handleTerminalCommand({ key: 'Enter' });
+            } else if (screen === 'dialing') {
+              window.open(`tel:${dialNumber}`, '_self');
+              setScreen('idle');
+              setDialNumber('');
             } else if (screen === 'menu') {
               const selected = MENU[menuIdx].id;
               if (selected === 'github') {
@@ -623,7 +683,7 @@ export default function NokiaUI() {
             }
           }}
         >
-          {screen === 'idle' ? 'Menu' : (screen === 'contacts' || screen === 'projects') ? 'Open' : screen === 'terminal' ? 'Enter' : 'Select'}
+          {screen === 'idle' ? 'Menu' : (screen === 'contacts' || screen === 'projects') ? 'Open' : (screen === 'terminal' || screen === 'dialing') ? 'Call' : 'Select'}
         </span>
         <span 
           className="cursor-pointer"
@@ -631,7 +691,13 @@ export default function NokiaUI() {
             if (screen === 'menu' || screen === 'messages' || screen === 'contacts' || screen === 'projects' || screen === 'snake' || screen === 'terminal') {
               setScreen('menu')
             }
-            if (screen === 'menu' && menuIdx === 0) {
+            if (screen === 'dialing') {
+              setDialNumber(prev => {
+                const next = prev.slice(0, -1);
+                if (next.length === 0) setScreen('idle');
+                return next;
+              });
+            } else if (screen === 'menu' && menuIdx === 0) {
               setScreen('idle')
             } else {
               setScreen('idle')

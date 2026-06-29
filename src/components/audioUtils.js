@@ -125,7 +125,6 @@ export const playStartupChime = () => {
 }
 
 export const playSaulTheme = () => {
-  // Just a tiny riff imitating the BCS theme
   const notes = [
     { f: 196.00, d: 0.2 }, // G3
     { f: 293.66, d: 0.2 }, // D4

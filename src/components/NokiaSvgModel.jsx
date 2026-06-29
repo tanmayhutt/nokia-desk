@@ -1,8 +1,18 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import NokiaUI from './NokiaUI'
 
 export default function NokiaSvgModel() {
   const [coverColor, setCoverColor] = useState('hue-rotate(0deg)');
+  const [isBacklightOn, setIsBacklightOn] = useState(true);
+
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === '*') setIsBacklightOn(prev => !prev);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []);
+
   const colors = [
     { name: 'Navy', filter: 'hue-rotate(0deg)' },
     { name: 'Red', filter: 'hue-rotate(150deg) saturate(2)' },
@@ -43,10 +53,10 @@ export default function NokiaSvgModel() {
 
         {/* The Screen Overlay */}
         <div 
-          className="absolute overflow-hidden"
+          className="absolute overflow-hidden transition-colors duration-500"
           style={{
             top: '26.3%', left: '17%', width: '67%', height: '20%',
-            backgroundColor: 'transparent',
+            backgroundColor: isBacklightOn ? 'transparent' : 'rgba(0,0,0,0.6)',
             borderRadius: '4%',
             containerType: 'inline-size'
           }}
