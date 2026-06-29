@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import NokiaUI from './NokiaUI'
 
-export default function NokiaSvgModel() {
+export default function NokiaSvgModel({ onOpenLink }) {
   const [coverColor, setCoverColor] = useState('hue-rotate(0deg)');
   const [isBacklightOn, setIsBacklightOn] = useState(true);
 
@@ -53,7 +53,7 @@ export default function NokiaSvgModel() {
 
         {/* The Screen Overlay */}
         <div 
-          className="absolute overflow-hidden transition-colors duration-500"
+          className="absolute overflow-hidden"
           style={{
             top: '26.3%', left: '17%', width: '67%', height: '20%',
             backgroundColor: isBacklightOn ? 'transparent' : 'rgba(0,0,0,0.6)',
@@ -61,8 +61,8 @@ export default function NokiaSvgModel() {
             containerType: 'inline-size'
           }}
         >
-          <div className="w-full h-full overflow-hidden relative">
-            <NokiaUI isMassive={true} />
+          <div className="w-full h-full overflow-hidden relative" style={{ opacity: isBacklightOn ? 1 : 0.6 }}>
+            <NokiaUI onOpenLink={onOpenLink} isMassive={true} />
           </div>
         </div>
 
