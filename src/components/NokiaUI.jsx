@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { PROFILE, MENU } from './NokiaData'
 import { playBeep, playSnakeEat, playSnakeCrash, playStartupChime, playSaulTheme } from './audioUtils'
 
-export default function NokiaUI({ onOpenLink }) {
+export default function NokiaUI() {
   const [screen, setScreen] = useState('off')
   const [menuIdx, setMenuIdx] = useState(0)
   const [timeStr, setTimeStr] = useState('')
@@ -335,9 +335,9 @@ export default function NokiaUI({ onOpenLink }) {
       if (e.key === 'ArrowDown') setActiveItemIdx(prev => Math.min(listLen - 1, prev + 1))
       if (e.key === 'Enter') {
         if (screen === 'contacts' && PROFILE.contacts[activeItemIdx]) {
-          onOpenLink?.('contact', PROFILE.contacts[activeItemIdx])
-        } else if (screen === 'projects' && projects[activeItemIdx]) {
-          onOpenLink?.('project', projects[activeItemIdx])
+          window.open(PROFILE.contacts[activeItemIdx].url, '_blank')
+        } else if (screen === 'projects' && projects[activeItemIdx] && projects[activeItemIdx].url) {
+          window.open(projects[activeItemIdx].url, '_blank')
         }
       }
       if (e.key === 'Escape' || e.key === 'Backspace') setScreen('menu')
@@ -511,7 +511,7 @@ export default function NokiaUI({ onOpenLink }) {
                     <div 
                       key={c.label} 
                       id={`list-item-${i}`}
-                      onClick={() => { setActiveItemIdx(i); onOpenLink?.('contact', c); }}
+                      onClick={() => { setActiveItemIdx(i); window.open(c.url, '_blank'); }}
                       className={`flex justify-between items-center py-4 px-2 cursor-pointer ${i === activeItemIdx ? 'bg-[#1a2e0e] text-[#9dc87a]' : ''}`}
                     >
                       <span className="text-[2cqw]">{c.label}</span>
@@ -535,7 +535,7 @@ export default function NokiaUI({ onOpenLink }) {
                     <div 
                       key={p.name} 
                       id={`list-item-${i}`}
-                      onClick={() => { setActiveItemIdx(i); if (p.url) onOpenLink?.('project', p); }}
+                      onClick={() => { setActiveItemIdx(i); if (p.url) window.open(p.url, '_blank'); }}
                       className={`flex flex-col justify-center py-4 px-2 border-b-[2px] border-[#1a2e0e]/50 cursor-pointer ${i === activeItemIdx ? 'bg-[#1a2e0e] text-[#9dc87a]' : ''}`}
                     >
                       <span className="font-bold text-[2cqw]">{p.name}</span>
@@ -658,9 +658,11 @@ export default function NokiaUI({ onOpenLink }) {
               setScreen('menu')
               setMenuIdx(0)
             } else if (screen === 'contacts' && PROFILE.contacts[activeItemIdx]) {
-              onOpenLink?.('contact', PROFILE.contacts[activeItemIdx])
+              window.open(PROFILE.contacts[activeItemIdx].url, '_blank')
             } else if (screen === 'projects' && projects[activeItemIdx]) {
-              onOpenLink?.('project', projects[activeItemIdx])
+              if (projects[activeItemIdx].url) {
+                window.open(projects[activeItemIdx].url, '_blank')
+              }
             } else if (screen === 'terminal') {
               handleTerminalCommand({ key: 'Enter' });
             } else if (screen === 'dialing') {
@@ -670,9 +672,11 @@ export default function NokiaUI({ onOpenLink }) {
             } else if (screen === 'menu') {
               const selected = MENU[menuIdx].id;
               if (selected === 'github') {
-                onOpenLink?.('github', { url: PROFILE.social.github });
+                window.open('https://github.com/tanmayhutt', '_blank');
+                setScreen('idle');
               } else if (selected === 'instagram') {
-                onOpenLink?.('instagram', { url: PROFILE.social.instagram });
+                window.open('https://www.instagram.com/tanmayhutt/', '_blank');
+                setScreen('idle');
               } else if (selected === 'terminal') {
                 handleOpenApp('terminal');
               } else {

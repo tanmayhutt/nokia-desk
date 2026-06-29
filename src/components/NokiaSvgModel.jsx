@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react'
 import NokiaUI from './NokiaUI'
+import nokiaImg from '../assets/nokia3310_model.svg'
 
-export default function NokiaSvgModel({ onOpenLink }) {
+export default function NokiaSvgModel() {
   const [coverColor, setCoverColor] = useState('hue-rotate(0deg)');
   const [isBacklightOn, setIsBacklightOn] = useState(true);
 
@@ -45,7 +46,7 @@ export default function NokiaSvgModel({ onOpenLink }) {
       <div className="relative w-full" style={{ aspectRatio: '280/640' }}>
         {/* The SVG Model */}
         <img 
-          src="/nokia3310_model.svg" 
+          src={nokiaImg}
           alt="Nokia 3310 Model" 
           className="w-full h-full block pointer-events-none drop-shadow-2xl transition-all duration-500" 
           style={{ filter: coverColor }}
@@ -62,7 +63,7 @@ export default function NokiaSvgModel({ onOpenLink }) {
           }}
         >
           <div className="w-full h-full overflow-hidden relative" style={{ opacity: isBacklightOn ? 1 : 0.6 }}>
-            <NokiaUI onOpenLink={onOpenLink} isMassive={true} />
+            <NokiaUI isMassive={true} />
           </div>
         </div>
 
