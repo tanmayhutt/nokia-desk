@@ -1,6 +1,6 @@
 # Nokia 3310 Emulator
 
-A web-based emulation of the classic Nokia 3310 design, blending retro aesthetics with modern web technologies and hardware integration.
+A web-based emulation of the classic Nokia 3310 design, blending retro aesthetics with modern web technologies.
 
 🌐 **[View Live Demo](https://tanmayhutt.github.io/nokia-desk/)**
 
@@ -8,13 +8,9 @@ A web-based emulation of the classic Nokia 3310 design, blending retro aesthetic
 
 ## Features
 
-- **Retro UI:** Authentic pixel fonts, classic menu systems, and green LCD glow.
-- **Hardware Integration:**
-  - 🔋 **Live Battery:** The battery indicator maps to your actual physical device's battery.
-  - 📶 **Live Signal:** The signal bars map to your real network connection status.
-- **Fully Interactive:** Click or use your keyboard to navigate menus, type, and toggle the backlight (`*` key).
-- **Classic Games & Apps:** Features a fully functional Snake clone and a bouncy retro screensaver.
-- **Xpress-on™ Covers:** Dynamically change the physical color of the phone casing on the fly.
+- Classic Nokia UI & Keypad
+- Playable Snake Game
+- Live Battery & Signal indicators
 
 ## Getting Started
 
