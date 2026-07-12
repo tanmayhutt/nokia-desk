@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { PROFILE, MENU } from './NokiaData'
 import { playBeep, playSnakeEat, playSnakeCrash, playStartupChime, playSaulTheme } from './audioUtils'
+import bootLogo from '../assets/boot_logo.png'
+import idleLogo from '../assets/idle_logo.png'
 
 export default function NokiaUI() {
   const [screen, setScreen] = useState('off')
@@ -407,7 +409,7 @@ export default function NokiaUI() {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center p-4 animate-[bootFade_3.5s_ease-in-out_forwards]">
         <img 
-          src="/boot_logo.png" 
+          src={bootLogo} 
           alt="Boot Logo"
           className="w-full h-full object-contain filter grayscale contrast-200 mix-blend-multiply opacity-90"
           style={{ imageRendering: 'pixelated' }}
@@ -456,7 +458,7 @@ export default function NokiaUI() {
               {/* Central Graphic */}
               <div className="flex-1 flex items-center justify-center px-[3cqw]">
                 <img 
-                  src="/idle_logo.png" 
+                  src={idleLogo} 
                   alt="Idle Graphic" 
                   className="w-full max-h-[12cqw] object-contain filter grayscale contrast-200 opacity-90 mix-blend-multiply" 
                   style={{ imageRendering: 'pixelated' }} 
