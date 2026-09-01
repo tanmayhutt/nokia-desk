@@ -37,6 +37,7 @@ export default function NokiaSvgModel() {
             key={c.name}
             onClick={() => setCoverColor(c.filter)}
             className={`px-3 py-1 text-xs font-sans rounded-full border-[1.5px] ${coverColor === c.filter ? 'border-white bg-white/20' : 'border-white/20 bg-black/20'} text-white/90 hover:text-white backdrop-blur-sm transition-colors shadow-lg cursor-pointer`}
+            aria-pressed={coverColor === c.filter}
           >
             {c.name}
           </button>
@@ -73,6 +74,7 @@ export default function NokiaSvgModel() {
           className="absolute cursor-pointer rounded-full opacity-0"
           style={{ top: '50.5%', left: '32.1%', width: '36.1%', height: '4.4%' }}
           title="Menu / Select"
+          aria-label="Menu or select"
         />
 
         {/* Soft Key: C (Escape) */}
@@ -81,6 +83,7 @@ export default function NokiaSvgModel() {
           className="absolute cursor-pointer rounded-full opacity-0"
           style={{ top: '52.3%', left: '16.8%', width: '18.9%', height: '7.7%' }}
           title="Back / Clear"
+          aria-label="Back or clear"
         />
 
         {/* Rocker: Up */}
@@ -89,6 +92,7 @@ export default function NokiaSvgModel() {
           className="absolute cursor-pointer rounded-full opacity-0"
           style={{ top: '52.5%', left: '55.7%', width: '28.6%', height: '5.2%' }}
           title="Up"
+          aria-label="Move up"
         />
 
         {/* Rocker: Down */}
@@ -97,6 +101,7 @@ export default function NokiaSvgModel() {
           className="absolute cursor-pointer rounded-full opacity-0"
           style={{ top: '57.7%', left: '55.7%', width: '28.6%', height: '5.2%' }}
           title="Down"
+          aria-label="Move down"
         />
 
         {/* Numpad Grid */}
@@ -110,6 +115,7 @@ export default function NokiaSvgModel() {
               onClick={() => dispatchKey(key)}
               className="w-full h-full cursor-pointer rounded-full opacity-0"
               title={key}
+              aria-label={`Key ${key}`}
             />
           ))}
         </div>

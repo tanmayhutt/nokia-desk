@@ -4,21 +4,21 @@ export const PROFILE = {
   available: true,
   about: [
     "Hi! I'm Tanmay.",
-    "A developer who builds for the web.",
-    "Full-stack. Based in India."
+    "A student building web products, developer tools and small systems.",
+    "I also work with Linux, interfaces and video."
   ],
   contacts: [
-    { label: "GitHub HQ", value: "Dial: @tanmayhutt", url: "https://github.com/tanmayhutt" },
-    { label: "LinkedIn Office", value: "Dial: in/tanmay-tiwari", url: "https://www.linkedin.com/in/tanmay-tiwari-72719526a/" },
-    { label: "Insta Hotline", value: "Dial: @tanmayhutt", url: "https://www.instagram.com/tanmayhutt/" },
-    { label: "YouTube Studio", value: "Dial: @@saul.3gp", url: "https://www.youtube.com/@saul.3gp" },
-    { label: "Direct Email", value: "tiwaritanmay1021...", url: "mailto:tiwaritanmay1021@gmail.com" },
-    { label: "Saul Goodman", value: "Dial: (505) 503-4455", url: "https://bettercallsaul.amc.com/" },
+    { label: "Main Portfolio", value: "tanmaytiwari.me", url: "https://tanmaytiwari.me" },
+    { label: "GitHub", value: "@tanmayhutt", url: "https://github.com/tanmayhutt" },
+    { label: "LinkedIn", value: "Tanmay Tiwari", url: "https://www.linkedin.com/in/tanmay-tiwari-72719526a/" },
+    { label: "Instagram", value: "@tanmayhutt", url: "https://www.instagram.com/tanmayhutt/" },
+    { label: "YouTube", value: "@saul.3gp", url: "https://www.youtube.com/@saul.3gp" },
+    { label: "Email", value: "Send a message", url: "mailto:tiwaritanmay1021@gmail.com" },
   ],
   projects: [
-    { name: "Nokia Desk", desc: "This portfolio!", content: "A 3D interactive portfolio inspired by retro electronics." },
-    { name: "Project Two", desc: "Coming soon...", content: "Details about project two..." },
-    { name: "Project Three", desc: "In the works...", content: "Details about project three..." },
+    { name: "Blend", desc: "Private YouTube taste comparison", url: "https://github.com/tanmayhutt/blend" },
+    { name: "Thwip", desc: "Coding-agent multiplexer", url: "https://github.com/tanmayhutt/thwip-cli" },
+    { name: "Arch Server", desc: "Repurposed laptop infrastructure", url: "https://github.com/tanmayhutt/arch-server" },
   ]
 }
 

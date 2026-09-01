@@ -1,5 +1,5 @@
 {
-  "name": "desk-temp",
+  "name": "nokia-desk",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,13 +12,8 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.6.1",
-    "framer-motion": "^12.42.0",
-    "lucide-react": "^1.21.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "three": "^0.185.0"
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.1",

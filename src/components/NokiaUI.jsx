@@ -9,7 +9,6 @@ export default function NokiaUI() {
   const [menuIdx, setMenuIdx] = useState(0)
   const [timeStr, setTimeStr] = useState('')
   
-  const [browserUrl, setBrowserUrl] = useState('')
   const [dialNumber, setDialNumber] = useState('')
 
   const lastInteractionRef = useRef(Date.now());
@@ -27,7 +26,7 @@ export default function NokiaUI() {
   const [gameState, setGameState] = useState('IDLE'); // IDLE, PLAYING, GAMEOVER
   const directionRef = useRef('RIGHT');
   const lastMoveDirectionRef = useRef('RIGHT');
-  const [renderTick, setRenderTick] = useState(0);
+  const [, setRenderTick] = useState(0);
 
   // GitHub Projects State
   const [projects, setProjects] = useState(PROFILE.projects);
@@ -37,6 +36,10 @@ export default function NokiaUI() {
   const [termCwd, setTermCwd] = useState('~');
   const [termInput, setTermInput] = useState('');
   const termScrollRef = useRef(null);
+
+  const openExternal = useCallback((url) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, []);
   
   const VFS = useRef({
     '~': {
@@ -317,10 +320,10 @@ export default function NokiaUI() {
       if (e.key === 'Enter') {
         const selected = MENU[menuIdx].id;
         if (selected === 'github') {
-          window.open('https://github.com/tanmayhutt', '_blank');
+          openExternal('https://github.com/tanmayhutt');
           setScreen('idle');
         } else if (selected === 'instagram') {
-          window.open('https://www.instagram.com/tanmayhutt/', '_blank');
+          openExternal('https://www.instagram.com/tanmayhutt/');
           setScreen('idle');
         } else {
           handleOpenApp(selected);
@@ -337,9 +340,9 @@ export default function NokiaUI() {
       if (e.key === 'ArrowDown') setActiveItemIdx(prev => Math.min(listLen - 1, prev + 1))
       if (e.key === 'Enter') {
         if (screen === 'contacts' && PROFILE.contacts[activeItemIdx]) {
-          window.open(PROFILE.contacts[activeItemIdx].url, '_blank')
+          openExternal(PROFILE.contacts[activeItemIdx].url)
         } else if (screen === 'projects' && projects[activeItemIdx] && projects[activeItemIdx].url) {
-          window.open(projects[activeItemIdx].url, '_blank')
+          openExternal(projects[activeItemIdx].url)
         }
       }
       if (e.key === 'Escape' || e.key === 'Backspace') setScreen('menu')
@@ -513,7 +516,7 @@ export default function NokiaUI() {
                     <div 
                       key={c.label} 
                       id={`list-item-${i}`}
-                      onClick={() => { setActiveItemIdx(i); window.open(c.url, '_blank'); }}
+                      onClick={() => { setActiveItemIdx(i); openExternal(c.url); }}
                       className={`flex justify-between items-center py-4 px-2 cursor-pointer ${i === activeItemIdx ? 'bg-[#1a2e0e] text-[#9dc87a]' : ''}`}
                     >
                       <span className="text-[2cqw]">{c.label}</span>
@@ -537,7 +540,7 @@ export default function NokiaUI() {
                     <div 
                       key={p.name} 
                       id={`list-item-${i}`}
-                      onClick={() => { setActiveItemIdx(i); if (p.url) window.open(p.url, '_blank'); }}
+                      onClick={() => { setActiveItemIdx(i); if (p.url) openExternal(p.url); }}
                       className={`flex flex-col justify-center py-4 px-2 border-b-[2px] border-[#1a2e0e]/50 cursor-pointer ${i === activeItemIdx ? 'bg-[#1a2e0e] text-[#9dc87a]' : ''}`}
                     >
                       <span className="font-bold text-[2cqw]">{p.name}</span>
@@ -660,10 +663,10 @@ export default function NokiaUI() {
               setScreen('menu')
               setMenuIdx(0)
             } else if (screen === 'contacts' && PROFILE.contacts[activeItemIdx]) {
-              window.open(PROFILE.contacts[activeItemIdx].url, '_blank')
+              openExternal(PROFILE.contacts[activeItemIdx].url)
             } else if (screen === 'projects' && projects[activeItemIdx]) {
               if (projects[activeItemIdx].url) {
-                window.open(projects[activeItemIdx].url, '_blank')
+                openExternal(projects[activeItemIdx].url)
               }
             } else if (screen === 'terminal') {
               handleTerminalCommand({ key: 'Enter' });
@@ -674,10 +677,10 @@ export default function NokiaUI() {
             } else if (screen === 'menu') {
               const selected = MENU[menuIdx].id;
               if (selected === 'github') {
-                window.open('https://github.com/tanmayhutt', '_blank');
+                openExternal('https://github.com/tanmayhutt');
                 setScreen('idle');
               } else if (selected === 'instagram') {
-                window.open('https://www.instagram.com/tanmayhutt/', '_blank');
+                openExternal('https://www.instagram.com/tanmayhutt/');
                 setScreen('idle');
               } else if (selected === 'terminal') {
                 handleOpenApp('terminal');
