@@ -1,132 +1,83 @@
-let audioCtx = null;
+// Procedural Web Audio sounds. The context is created lazily inside the first
+// sound call, which always runs from a key press or tap, so browsers allow it.
+let audioCtx = null
+let enabled = true
+
+export function setSoundEnabled(value) {
+  enabled = Boolean(value)
+  if (!enabled && audioCtx && audioCtx.state === 'running') {
+    audioCtx.suspend().catch(() => {})
+  }
+}
 
 function getContext() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
-  }
-  return audioCtx;
-}
-
-export const playBeep = () => {
+  if (!enabled || typeof window === 'undefined') return null
+  const Ctor = window.AudioContext || window.webkitAudioContext
+  if (!Ctor) return null
   try {
-    const ctx = getContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    
-    osc.type = 'square';
-    // Very fast frequency drop creates a classic sharp "tick" or "chirp"
-    osc.frequency.setValueAtTime(2000, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.03);
-    
-    gain.gain.setValueAtTime(0.05, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.03);
-  } catch (e) {
-    console.warn("Audio play failed:", e);
+    if (!audioCtx) audioCtx = new Ctor()
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {})
+    return audioCtx
+  } catch {
+    return null
   }
-};
-
-export const playSnakeEat = () => {
-  const ctx = getContext();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = 'square';
-  osc.frequency.setValueAtTime(800, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
-  gain.gain.setValueAtTime(0.1, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.1);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + 0.1);
 }
 
-export const playSnakeCrash = () => {
-  const ctx = getContext();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(200, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 0.3);
-  gain.gain.setValueAtTime(0.1, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + 0.3);
+function tone(ctx, { type = 'square', from, to, start, duration, volume = 0.06, ramp = 'exp' }) {
+  const osc = ctx.createOscillator()
+  const gain = ctx.createGain()
+  osc.type = type
+  osc.frequency.setValueAtTime(from, start)
+  if (to) osc.frequency.exponentialRampToValueAtTime(to, start + duration)
+  gain.gain.setValueAtTime(volume, start)
+  if (ramp === 'exp') gain.gain.exponentialRampToValueAtTime(0.0001, start + duration)
+  else gain.gain.linearRampToValueAtTime(0, start + duration)
+  osc.connect(gain)
+  gain.connect(ctx.destination)
+  osc.start(start)
+  osc.stop(start + duration + 0.02)
 }
 
-export const playStartupChime = () => {
-  const notes = [
-    { f: 1318.51, d: 0.15 }, // E6
-    { f: 1174.66, d: 0.15 }, // D6
-    { f: 739.99,  d: 0.3 },  // F#5
-    { f: 830.61,  d: 0.3 },  // G#5
-    { f: 1108.73, d: 0.15 }, // C#6
-    { f: 987.77,  d: 0.15 }, // B5
-    { f: 587.33,  d: 0.3 },  // D5
-    { f: 659.25,  d: 0.3 },  // E5
-    { f: 987.77,  d: 0.15 }, // B5
-    { f: 880.00,  d: 0.15 }, // A5
-    { f: 554.37,  d: 0.3 },  // C#5
-    { f: 659.25,  d: 0.3 },  // E5
-    { f: 880.00,  d: 0.6 }   // A5
-  ];
-  
-  const ctx = getContext();
-  let time = ctx.currentTime;
-  
-  notes.forEach(note => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine'; // Classic nokia chime is quite pure
-    osc.frequency.value = note.f;
-    
-    gain.gain.setValueAtTime(0.1, time);
-    gain.gain.linearRampToValueAtTime(0, time + note.d);
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    
-    osc.start(time);
-    osc.stop(time + note.d);
-    time += note.d;
-  });
+function play(fn) {
+  const ctx = getContext()
+  if (!ctx) return
+  try {
+    fn(ctx, ctx.currentTime)
+  } catch {
+    // Audio is decorative. Never let it break input handling.
+  }
 }
 
-export const playSaulTheme = () => {
-  const notes = [
-    { f: 196.00, d: 0.2 }, // G3
-    { f: 293.66, d: 0.2 }, // D4
-    { f: 392.00, d: 0.4 }, // G4
-    { f: 349.23, d: 0.2 }, // F4
-    { f: 293.66, d: 0.4 }, // D4
-  ];
-  
-  const ctx = getContext();
-  let time = ctx.currentTime;
-  notes.forEach(note => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.value = note.f;
-    
-    gain.gain.setValueAtTime(0.1, time);
-    gain.gain.linearRampToValueAtTime(0, time + note.d);
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    
-    osc.start(time);
-    osc.stop(time + note.d);
-    time += note.d;
-  });
+export const playBeep = () =>
+  play((ctx, t) => tone(ctx, { from: 2000, to: 800, start: t, duration: 0.03, volume: 0.05 }))
+
+export const playSnakeEat = () =>
+  play((ctx, t) => tone(ctx, { from: 800, to: 1200, start: t, duration: 0.1, volume: 0.08, ramp: 'linear' }))
+
+export const playSnakeCrash = () =>
+  play((ctx, t) => tone(ctx, { type: 'sawtooth', from: 200, to: 50, start: t, duration: 0.3, volume: 0.08, ramp: 'linear' }))
+
+function melody(notes, type, volume) {
+  play((ctx, t) => {
+    let time = t
+    notes.forEach(([f, d]) => {
+      tone(ctx, { type, from: f, start: time, duration: d * 0.95, volume, ramp: 'linear' })
+      time += d
+    })
+  })
 }
+
+// The classic Nokia tune, played as a boot chime.
+export const playStartupChime = () =>
+  melody(
+    [
+      [1318.51, 0.15], [1174.66, 0.15], [739.99, 0.3], [830.61, 0.3],
+      [1108.73, 0.15], [987.77, 0.15], [587.33, 0.3], [659.25, 0.3],
+      [987.77, 0.15], [880.0, 0.15], [554.37, 0.3], [659.25, 0.3], [880.0, 0.6],
+    ],
+    'sine',
+    0.08,
+  )
+
+export const playSaulTheme = () =>
+  melody([[196.0, 0.2], [293.66, 0.2], [392.0, 0.4], [349.23, 0.2], [293.66, 0.4]], 'square', 0.06)

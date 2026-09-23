@@ -12,19 +12,890 @@
   font-display: swap;
 }
 
+:root {
+  --bar-h: 56px;
+  --desk: #434553;
+  --paper: #f2ecdf;
+  --paper-ink: #25272f;
+  --nokia-blue: #1f3f8a;
+  --lamp: #ffd48a;
+  --ink: #1c2a12;
+  --lcd-light: #aecb90;
+  color-scheme: dark;
+}
+
+html,
 body {
   margin: 0;
   padding: 0;
+  background: #34363f;
+}
+
+body {
+  font-family: "Nokia Cellphone FC", monospace;
   -webkit-font-smoothing: none;
   -moz-osx-font-smoothing: grayscale;
   font-smooth: never;
   text-rendering: optimizeSpeed;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
   overflow-x: hidden;
-  overflow-y: auto;
-  /* Vintage Windows 95 cursor (base64 encoded small arrow) */
+  /* Vintage arrow cursor */
   cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path d="M0,0 v14 l4,-4 l3,5 l2,-1 l-3,-5 l5,0 z" fill="white" stroke="black" stroke-width="1"/></svg>'), auto;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------- Desk scene ---------- */
+
+.desk {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  overflow-x: hidden;
+  color: #ece8dc;
+  background-color: var(--desk);
+  background-image:
+    radial-gradient(1100px 680px at 20% -12%, rgb(255 212 138 / 0.22), transparent 62%),
+    radial-gradient(640px 520px at 50% 58%, rgb(255 236 200 / 0.07), transparent 70%),
+    radial-gradient(ellipse at 50% 45%, transparent 48%, rgb(12 12 22 / 0.6) 100%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .09 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* Faint cutting-mat grid under the phone: a desk surface, not a dashboard. */
+.desk::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.028) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(ellipse 60% 70% at 50% 55%, #000 30%, transparent 80%);
+}
+
+.desk-bar {
+  position: relative;
+  z-index: 2;
+  height: var(--bar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 20px;
+}
+
+.desk-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #ece8dc;
+  text-decoration: none;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.desk-link:hover {
+  background: rgb(255 255 255 / 0.08);
+}
+
+.desk-link:focus-visible,
+.cover-chip:focus-visible,
+.profile-toggle button:focus-visible,
+.phone-key:focus-visible {
+  outline: 2px solid var(--lamp);
+  outline-offset: 2px;
+}
+
+.desk-link.is-current {
+  color: var(--lamp);
+}
+
+.desk-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.desk-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.desk-nav-label {
+  font-size: 12px;
+  color: rgb(236 232 220 / 0.5);
+  margin-right: 6px;
+}
+
+.desk-stage {
+  --phone-w: min(calc(100vw - 32px), calc((100vh - var(--bar-h) - 64px) * 0.4375), 470px);
+  --phone-w: min(calc(100vw - 32px), calc((100svh - var(--bar-h) - 64px) * 0.4375), 470px);
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 56px;
+  padding: 4px 16px 24px;
+}
+
+.phone-wrap {
+  position: relative;
+  padding-bottom: 30px;
+}
+
+.phone-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  margin: 0;
+  white-space: nowrap;
+  font-size: 12px;
+  color: rgb(236 232 220 / 0.72);
+  transition: opacity 0.4s;
+}
+
+.phone-hint.is-hidden {
+  opacity: 0;
+}
+
+/* ---------- Paper cards ---------- */
+
+.desk-card {
+  width: 280px;
+  color: var(--paper-ink);
+  background-color: var(--paper);
+  background-image: linear-gradient(transparent 23px, rgb(31 63 138 / 0.06) 24px);
+  background-size: 100% 24px;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.7),
+    0 2px 5px rgb(0 0 0 / 0.25),
+    0 22px 44px rgb(0 0 0 / 0.35);
+}
+
+.desk-guide {
+  justify-self: end;
+  transform: rotate(-1.6deg);
+}
+
+.desk-covers {
+  justify-self: start;
+  transform: rotate(1.3deg);
+}
+
+.desk-card-band {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  color: #fff;
+  background: linear-gradient(180deg, #2a4f9e, var(--nokia-blue));
+}
+
+.desk-card-band h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: normal;
+}
+
+.desk-card-band span {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.guide-list {
+  list-style: none;
+  margin: 0;
+  padding: 16px 16px 8px;
+  display: grid;
+  gap: 10px;
+}
+
+.guide-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.keycap {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  min-width: 28px;
+  height: 26px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: 12px;
+  color: #2b2e36;
+  background: linear-gradient(#fdfbf6, #dcd5c5);
+  border: 1px solid #b4ac9a;
+  border-bottom-width: 3px;
+  border-radius: 7px;
+}
+
+.keycap.is-wide {
+  min-width: 58px;
+}
+
+.keycap-pair {
+  display: inline-flex;
+  gap: 2px;
+  width: 58px;
+  flex-shrink: 0;
+}
+
+.keycap-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.guide-note {
+  margin: 0;
+  padding: 6px 16px 16px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #5b5e68;
+}
+
+.cover-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  padding: 18px 12px 14px;
+}
+
+.cover-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font: inherit;
+  font-size: 10px;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.cover-swatch {
+  width: 30px;
+  height: 46px;
+  border-radius: 45% 45% 40% 40% / 30% 30% 22% 22%;
+  background:
+    radial-gradient(circle at 32% 22%, rgb(255 255 255 / 0.5), transparent 42%),
+    linear-gradient(90deg, rgb(0 0 0 / 0.18), transparent 30%, transparent 70%, rgb(0 0 0 / 0.22)),
+    var(--swatch);
+  box-shadow: inset 0 -4px 6px rgb(0 0 0 / 0.28), 0 3px 5px rgb(0 0 0 / 0.25);
+  transition: transform 0.2s;
+}
+
+.cover-chip:hover .cover-swatch {
+  transform: translateY(-2px);
+}
+
+.cover-chip.is-active .cover-swatch {
+  transform: translateY(-3px);
+  outline: 2px solid var(--nokia-blue);
+  outline-offset: 3px;
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 16px 16px;
+  font-size: 12px;
+}
+
+.profile-toggle {
+  display: flex;
+  padding: 3px;
+  background: #ddd4c2;
+  border-radius: 999px;
+}
+
+.profile-toggle button {
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: #4a4d56;
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.profile-toggle button.is-active {
+  color: #fff;
+  background: var(--nokia-blue);
+}
+
+/* ---------- Phone ---------- */
+
+.phone {
+  position: relative;
+  width: var(--phone-w);
+  aspect-ratio: 280 / 640;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  filter: drop-shadow(0 26px 30px rgb(0 0 0 / 0.42)) drop-shadow(0 4px 6px rgb(0 0 0 / 0.3));
+}
+
+.phone-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transition: filter 0.45s ease;
+}
+
+/* Unfiltered copy of the LCD glass so cover colours never tint the screen. */
+.phone-screen-copy {
+  clip-path: inset(25.9% 16.1% 53.6% 17.3% round 6% / 3%);
+}
+
+.phone-key {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.12s, box-shadow 0.12s;
+}
+
+@media (hover: hover) {
+  .phone-key:hover {
+    background: rgb(255 255 255 / 0.12);
+  }
+}
+
+.phone-key:active,
+.phone-key.is-pressed {
+  background: rgb(18 22 40 / 0.22);
+  box-shadow: inset 0 2px 7px rgb(0 0 0 / 0.4);
+}
+
+.phone-lcd {
+  position: absolute;
+  top: 26.4%;
+  left: 18.4%;
+  width: 64.2%;
+  height: 19.4%;
+  container-type: inline-size;
+  border-radius: 4% / 6%;
+  overflow: hidden;
+}
+
+/* ---------- LCD ---------- */
+
+.lcd {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  color: var(--ink);
+  font-family: "Nokia Cellphone FC", monospace;
+  font-size: 7.2cqw;
+  line-height: 1.2;
+  image-rendering: pixelated;
+}
+
+.lcd button {
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.lcd-content {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 2.6cqw 4cqw 0.6cqw;
+  /* LCD segments cast a faint shadow onto the reflector behind them. */
+  text-shadow: 0.4cqw 0.4cqw 0 rgb(28 42 18 / 0.16);
+  transition: opacity 0.4s;
+}
+
+.lcd-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lcd-soft {
+  flex-shrink: 0;
+  height: 9cqw;
+  text-align: center !important;
+}
+
+.lcd-pixels {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image:
+    linear-gradient(90deg, rgb(20 36 12 / 0.045) 1px, transparent 1px),
+    linear-gradient(rgb(20 36 12 / 0.045) 1px, transparent 1px);
+  background-size: calc(100cqw / 84) calc(100cqw / 84);
+}
+
+.lcd-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: rgb(18 34 10 / 0.1);
+  transition: background-color 0.6s, opacity 0.6s;
+}
+
+.lcd-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(ellipse 80% 90% at 50% 45%, rgb(214 255 150 / 0.42), rgb(160 230 110 / 0.14) 75%);
+  mix-blend-mode: screen;
+  transition: opacity 0.6s;
+}
+
+.lcd.is-lit .lcd-glow {
+  background: transparent;
+}
+
+.lcd.is-lit .lcd-glow::after {
+  opacity: 1;
+}
+
+.lcd.is-off .lcd-glow {
+  background: rgb(14 26 8 / 0.26);
+}
+
+.lcd-head {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2cqw;
+  padding-bottom: 0.9cqw;
+  margin-bottom: 1.2cqw;
+  border-bottom: 0.6cqw solid currentColor;
+  white-space: nowrap;
+}
+
+/* Off */
+.lcd-off-hint {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.4cqw;
+  font-size: 5.6cqw !important;
+  text-align: center !important;
+  opacity: 0.42;
+}
+
+.lcd-off-icon {
+  width: 12cqw;
+  height: 12cqw;
+}
+
+/* Boot */
+.lcd-boot {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  animation: bootFade 3.2s ease-in-out forwards;
+}
+
+.lcd-boot img {
+  max-width: 92%;
+  max-height: 100%;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+  filter: grayscale(1) contrast(1.6);
+}
+
+/* Idle */
+.lcd-idle {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 1.6cqw;
+}
+
+.lcd-bars {
+  width: 6cqw;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-top: 0.6cqw;
+}
+
+.lcd-bars.is-right {
+  align-items: flex-end;
+}
+
+.lcd-bars i {
+  display: block;
+  height: 3.6cqw;
+  background: currentColor;
+  box-shadow: 0.4cqw 0.4cqw 0 rgb(28 42 18 / 0.16);
+}
+
+.lcd-status-icon {
+  width: 5cqw;
+  height: 6.4cqw;
+}
+
+.lcd-idle-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lcd-idle-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 6.2cqw;
+}
+
+.lcd-idle-logo {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  object-fit: contain;
+  opacity: 0.88;
+  mix-blend-mode: multiply;
+  filter: grayscale(1) contrast(2);
+}
+
+.lcd-idle-operator {
+  text-align: center;
+  font-size: 6.2cqw;
+}
+
+/* Menu */
+.lcd-menu,
+.lcd-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lcd-menu-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lcd-menu-icon {
+  height: 100%;
+  max-height: 32cqw;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+
+.lcd-menu-icon svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0.4cqw 0.4cqw 0 rgb(28 42 18 / 0.16));
+}
+
+.lcd-scrollbar {
+  position: absolute;
+  top: 0.5cqw;
+  bottom: 0.5cqw;
+  right: 0;
+  width: 2cqw;
+}
+
+.lcd-scrollbar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0.7cqw;
+  width: 0.6cqw;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.lcd-scrollbar i {
+  position: absolute;
+  left: 0;
+  width: 2cqw;
+  height: 5cqw;
+  top: calc(var(--p) * (100% - 5cqw));
+  background: currentColor;
+  transition: top 0.15s steps(3);
+}
+
+/* Lists */
+.lcd-list-rows,
+.lcd-message,
+.lcd-term-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.lcd-list-rows::-webkit-scrollbar,
+.lcd-message::-webkit-scrollbar,
+.lcd-term-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.lcd-row {
+  display: flex !important;
+  flex-direction: column;
+  width: 100%;
+  padding: 0.7cqw 1.4cqw !important;
+}
+
+.lcd-row.is-active {
+  color: var(--lcd-light) !important;
+  background: var(--ink) !important;
+  text-shadow: none;
+}
+
+.lcd-row-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.lcd-row-sub {
+  margin-top: 0.4cqw;
+  font-size: 5.2cqw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lcd-radio {
+  display: grid;
+  place-items: center;
+  width: 4.6cqw;
+  height: 4.6cqw;
+  border: 0.6cqw solid currentColor;
+  border-radius: 50%;
+}
+
+.lcd-radio b {
+  width: 1.8cqw;
+  height: 1.8cqw;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+.lcd-message {
+  font-size: 5.8cqw;
+  line-height: 1.35;
+}
+
+.lcd-message p {
+  margin: 0 0 1.6cqw;
+}
+
+.lcd-message-from {
+  opacity: 0.7;
+}
+
+/* Snake */
+.lcd-snake {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.lcd-snake-score {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  font-size: 5.4cqw;
+  margin-bottom: 0.8cqw;
+}
+
+.lcd-snake-board {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  max-width: 100%;
+  display: grid;
+  border: 0.6cqw solid currentColor;
+  box-shadow: 0.4cqw 0.4cqw 0 rgb(28 42 18 / 0.16);
+}
+
+.lcd-snake-board i {
+  display: block;
+}
+
+.lcd-snake-board .is-body,
+.lcd-snake-board .is-head {
+  background: currentColor;
+  box-shadow: 0.3cqw 0.3cqw 0 rgb(28 42 18 / 0.16);
+}
+
+.lcd-snake-board .is-body {
+  transform: scale(0.84);
+}
+
+.lcd-snake-board .is-food {
+  background: currentColor;
+  transform: rotate(45deg) scale(0.6);
+}
+
+.lcd-snake-card {
+  position: absolute;
+  inset: 16% 14%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2cqw;
+  font-size: 5cqw;
+  text-align: center;
+  background: rgb(160 190 128 / 0.96);
+  border: 0.6cqw solid currentColor;
+  border-radius: 2cqw;
+}
+
+.lcd-snake-card strong {
+  font-size: 7cqw;
+  font-weight: normal;
+}
+
+/* Terminal */
+.lcd-term {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 5cqw;
+  line-height: 1.3;
+}
+
+.lcd-term-scroll {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lcd-term-scroll .is-input {
+  margin-top: 1cqw;
+  opacity: 0.75;
+}
+
+.lcd-term-prompt {
+  display: flex;
+  gap: 1cqw;
+  margin-top: 1cqw;
+}
+
+.lcd-term-prompt input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  caret-color: currentColor;
+  background: none;
+  border: 0;
+  outline: 0;
+}
+
+@media (pointer: coarse) {
+  /* Keeps iOS from zooming the page when the field is focused. */
+  .lcd-term-prompt input {
+    font-size: max(16px, 5cqw);
+  }
+}
+
+/* Dialing, notices, screensaver */
+.lcd-dial {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-end;
+}
+
+.lcd-dial-label {
+  align-self: flex-start;
+  margin-bottom: auto;
+  font-size: 6.2cqw;
+}
+
+.lcd-dial-number {
+  font-size: 11cqw;
+  line-height: 1.1;
+  text-align: right;
+  word-break: break-all;
+}
+
+.lcd-notice {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2cqw;
+  text-align: center;
+}
+
+.lcd-notice strong {
+  font-size: 8cqw;
+  font-weight: normal;
+}
+
+.lcd-notice span {
+  font-size: 5.2cqw;
+}
+
+.lcd-saver {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  font-size: 18cqw;
 }
 
 @keyframes bootFade {
@@ -34,28 +905,83 @@ body {
   100% { opacity: 0; }
 }
 
-@keyframes bootScale {
-  0% { transform: scale(0.8); }
-  20% { transform: scale(1); }
-  80% { transform: scale(1.05); }
-  100% { transform: scale(1.5); }
+/* Terminal easter egg */
+.lcd.matrix-mode {
+  background-color: #000;
 }
 
-.matrix-mode {
-  background-color: black !important;
-  color: #0f0 !important;
-  text-shadow: 0 0 5px #0f0;
-  transition: all 0.5s ease-in-out;
+.lcd.matrix-mode .lcd-content,
+.lcd.matrix-mode .lcd-content * {
+  color: #3f3 !important;
+  text-shadow: 0 0 1.2cqw #3f3;
 }
-.matrix-mode * {
-  color: #0f0 !important;
-  border-color: #0f0 !important;
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 1099px) {
+  .desk-stage {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 28px 24px;
+  }
+
+  .phone-wrap {
+    order: -1;
+    flex-basis: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  .desk-card {
+    width: min(300px, 100%);
+  }
+}
+
+@media (max-width: 560px) {
+  :root {
+    --bar-h: 48px;
+  }
+
+  .desk-bar {
+    padding: 0 8px;
+  }
+
+  .desk-nav-label {
+    display: none;
+  }
+
+  .desk-link {
+    padding: 8px 7px;
+  }
+
+  .desk-stage {
+    padding: 2px 16px 24px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /* Keep the boot logo visible instead of flashing past. */
+  .lcd-boot {
+    animation: none;
+  }
+}
+
+@media (max-width: 1099px) {
+  .desk-covers {
+    order: 1;
+  }
+
+  .desk-guide {
+    order: 2;
   }
 }

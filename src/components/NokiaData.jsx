@@ -1,84 +1,195 @@
-export const PROFILE = {
-  name: "Tanmay",
-  operator: "tanmayhutt",
-  available: true,
-  about: [
-    "Hi! I'm Tanmay.",
-    "A student building web products, developer tools and small systems.",
-    "I also work with Linux, interfaces and video."
-  ],
-  contacts: [
-    { label: "Main Portfolio", value: "tanmaytiwari.me", url: "https://tanmaytiwari.me" },
-    { label: "GitHub", value: "@tanmayhutt", url: "https://github.com/tanmayhutt" },
-    { label: "LinkedIn", value: "Tanmay Tiwari", url: "https://www.linkedin.com/in/tanmay-tiwari-72719526a/" },
-    { label: "Instagram", value: "@tanmayhutt", url: "https://www.instagram.com/tanmayhutt/" },
-    { label: "YouTube", value: "@saul.3gp", url: "https://www.youtube.com/@saul.3gp" },
-    { label: "Email", value: "Send a message", url: "mailto:tiwaritanmay1021@gmail.com" },
-  ],
-  projects: [
-    { name: "Blend", desc: "Private YouTube taste comparison", url: "https://github.com/tanmayhutt/blend" },
-    { name: "Thwip", desc: "Coding-agent multiplexer", url: "https://github.com/tanmayhutt/thwip-cli" },
-    { name: "Arch Server", desc: "Repurposed laptop infrastructure", url: "https://github.com/tanmayhutt/arch-server" },
-  ]
+export const LINKS = {
+  portfolio: 'https://tanmaytiwari.me/',
+  resume: 'https://tanmaytiwari.me/resume/',
+  github: 'https://github.com/tanmayhutt',
+  repos: 'https://github.com/tanmayhutt?tab=repositories',
+  email: 'mailto:tiwaritanmay1021@gmail.com',
 }
 
-import React from 'react';
+export const PROFILE = {
+  name: 'Tanmay',
+  operator: 'tanmayhutt',
+  about: [
+    "Hi! I'm Tanmay.",
+    'A student building web products, developer tools and small systems.',
+    'I also work with Linux, interfaces and video.',
+  ],
+  contacts: [
+    { label: 'Portfolio', value: 'tanmaytiwari.me', url: LINKS.portfolio },
+    { label: 'GitHub', value: '@tanmayhutt', url: LINKS.github },
+    { label: 'LinkedIn', value: 'Tanmay Tiwari', url: 'https://www.linkedin.com/in/tanmay-tiwari-72719526a/' },
+    { label: 'Instagram', value: '@tanmayhutt', url: 'https://www.instagram.com/tanmayhutt/' },
+    { label: 'YouTube', value: '@saul.3gp', url: 'https://www.youtube.com/@saul.3gp' },
+    { label: 'Email', value: 'Write to me', url: LINKS.email },
+  ],
+  projects: [
+    { name: 'Blend', desc: 'Compare YouTube tastes', url: 'https://github.com/tanmayhutt/blend' },
+    { name: 'Thwip', desc: 'Hub for coding agents', url: 'https://github.com/tanmayhutt/thwip-cli' },
+    { name: 'Arch server', desc: 'Self-hosted Arch node', url: 'https://github.com/tanmayhutt/arch-server' },
+    { name: 'FilmedIn', desc: 'Track films, playlists', url: 'https://github.com/tanmayhutt/FilmedIn' },
+    { name: 'WiFiSense', desc: 'Wi-Fi presence sensing', url: 'https://github.com/tanmayhutt/WiFiSense' },
+    { name: 'More repos', desc: 'All work on GitHub', url: LINKS.repos },
+  ],
+  desks: [
+    { label: 'Portfolio', value: 'Main site', url: LINKS.portfolio, sameTab: true },
+    { label: 'Linux desk', value: 'Sibling desk', url: '/linux-desk/', sameTab: true },
+    { label: 'Spotify desk', value: 'Sibling desk', url: '/spotify-desk/', sameTab: true },
+  ],
+}
 
-const IconPhonebook = () => (
-  <svg viewBox="0 0 16 16" width="100%" height="100%" fill="currentColor" style={{ shapeRendering: 'crispEdges' }}>
-    <path d="M4,2 h8 v12 h-8 z M2,3 h2 v2 h-2 z M2,6 h2 v2 h-2 z M2,9 h2 v2 h-2 z" />
-  </svg>
-)
+/* 16x16 pixel bitmaps. "#" is an ink pixel. */
+const BITMAPS = {
+  messages: [
+    '................',
+    '################',
+    '##............##',
+    '#.#..........#.#',
+    '#..#........#..#',
+    '#...#......#...#',
+    '#....#....#....#',
+    '#.....####.....#',
+    '#..............#',
+    '#..............#',
+    '################',
+  ],
+  contacts: [
+    '..############..',
+    '.##..........#..',
+    '..#...####...#..',
+    '.##...####...#..',
+    '..#...####...#..',
+    '.##....##....#..',
+    '..#..######..#..',
+    '.##.########.#..',
+    '..#.########.#..',
+    '.##..........#..',
+    '..############..',
+  ],
+  projects: [
+    '.#####..........',
+    '#.....#########.',
+    '#..............#',
+    '################',
+    '#..............#',
+    '#..............#',
+    '#..............#',
+    '#..............#',
+    '#..............#',
+    '################',
+  ],
+  resume: [
+    '..#########.....',
+    '..#.......##....',
+    '..#.......#.#...',
+    '..#.......####..',
+    '..#..........#..',
+    '..#.#######..#..',
+    '..#..........#..',
+    '..#.#####....#..',
+    '..#..........#..',
+    '..#.######...#..',
+    '..#..........#..',
+    '..############..',
+  ],
+  snake: [
+    '............##..',
+    '............##..',
+    '................',
+    '##########......',
+    '##########......',
+    '........##......',
+    '........##......',
+    '..########......',
+    '..########......',
+    '..##............',
+    '..##............',
+    '..############..',
+    '..##########.##.',
+  ],
+  terminal: [
+    '################',
+    '#..............#',
+    '#.#............#',
+    '#..#...........#',
+    '#.#..####......#',
+    '#..............#',
+    '#..............#',
+    '################',
+    '......####......',
+    '...##########...',
+  ],
+  desks: [
+    '.....###########',
+    '.....###########',
+    '..###########..#',
+    '..###########..#',
+    '###########.#..#',
+    '###########.#..#',
+    '#.........#.#..#',
+    '#.........#.####',
+    '#.........#.#...',
+    '#.........###...',
+    '#.........#.....',
+    '###########.....',
+  ],
+  profiles: [
+    '......#.........',
+    '.....##......#..',
+    '....###...#...#.',
+    '#######....#..#.',
+    '#######.#..#...#',
+    '#######.#..#...#',
+    '#######....#..#.',
+    '....###...#...#.',
+    '.....##......#..',
+    '......#.........',
+  ],
+  power: [
+    '.......##.......',
+    '...#...##...#...',
+    '..##...##...##..',
+    '.##....##....##.',
+    '.#.....##.....#.',
+    '##............##',
+    '##............##',
+    '.#............#.',
+    '.##..........##.',
+    '..###......###..',
+    '....########....',
+  ],
+}
 
-const IconProjects = () => (
-  <svg viewBox="0 0 16 16" width="100%" height="100%" fill="currentColor" style={{ shapeRendering: 'crispEdges' }}>
-    <path d="M2,3 h5 l2,2 h5 v8 h-12 z M3,6 h10 v1 h-10 z M3,8 h8 v1 h-8 z" />
-  </svg>
-)
-
-const IconGitHub = () => (
-  <svg viewBox="0 0 16 16" width="100%" height="100%" fill="currentColor" style={{ shapeRendering: 'crispEdges' }}>
-    <path d="M3,5 h10 v6 h-10 z" />
-    <rect x="3" y="3" width="2" height="2" />
-    <rect x="11" y="3" width="2" height="2" />
-    {/* Eyes */}
-    <rect x="5" y="7" width="2" height="2" fill="#879E66" />
-    <rect x="9" y="7" width="2" height="2" fill="#879E66" />
-    <rect x="5" y="11" width="6" height="3" />
-  </svg>
-)
-
-const IconInsta = () => (
-  <svg viewBox="0 0 16 16" width="100%" height="100%" fill="currentColor" style={{ shapeRendering: 'crispEdges' }}>
-    <path d="M3,3 h10 v10 h-10 z" fill="none" stroke="currentColor" strokeWidth="2" />
-    <rect x="6" y="6" width="4" height="4" fill="none" stroke="currentColor" strokeWidth="2" />
-    <rect x="10" y="4" width="2" height="2" />
-  </svg>
-)
-
-const IconSnake = () => (
-  <svg viewBox="0 0 16 16" width="100%" height="100%" fill="currentColor" style={{ shapeRendering: 'crispEdges' }}>
-    <path d="M2,12 h10 v-4 h-6 v-4 h6" fill="none" stroke="currentColor" strokeWidth="2" />
-    <rect x="12" y="3" width="3" height="3" />
-    <rect x="2" y="3" width="2" height="2" />
-  </svg>
-)
-
-const IconTerminal = () => (
-  <svg viewBox="0 0 16 16" width="100%" height="100%" fill="currentColor" style={{ shapeRendering: 'crispEdges' }}>
-    <path d="M2,3 h12 v8 h-12 z" fill="none" stroke="currentColor" strokeWidth="2" />
-    <rect x="4" y="5" width="2" height="2" />
-    <rect x="7" y="7" width="3" height="1" />
-    <rect x="6" y="11" width="4" height="2" />
-    <rect x="4" y="13" width="8" height="1" />
-  </svg>
-)
+export function PixelIcon({ name, className = '' }) {
+  const rows = BITMAPS[name] || []
+  const offset = (16 - rows.length) / 2
+  const rects = []
+  rows.forEach((row, y) => {
+    let x = 0
+    while (x < row.length) {
+      if (row[x] === '#') {
+        let w = 1
+        while (row[x + w] === '#') w++
+        rects.push(<rect key={`${x}-${y}`} x={x} y={y + offset} width={w} height={1} />)
+        x += w
+      } else {
+        x++
+      }
+    }
+  })
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="currentColor" shapeRendering="crispEdges" aria-hidden="true">
+      {rects}
+    </svg>
+  )
+}
 
 export const MENU = [
-  { id: 'contacts', icon: <IconPhonebook />, label: 'Phonebook' },
-  { id: 'projects', icon: <IconProjects />, label: 'Projects' },
-  { id: 'github', icon: <IconGitHub />, label: 'GitHub' },
-  { id: 'instagram', icon: <IconInsta />, label: 'Instagram' },
-  { id: 'snake', icon: <IconSnake />, label: 'Snake' },
-  { id: 'terminal', icon: <IconTerminal />, label: 'Terminal' },
+  { id: 'messages', label: 'Messages' },
+  { id: 'contacts', label: 'Phonebook' },
+  { id: 'projects', label: 'Projects' },
+  { id: 'resume', label: 'Resume' },
+  { id: 'snake', label: 'Snake' },
+  { id: 'terminal', label: 'Terminal' },
+  { id: 'desks', label: 'Desks' },
+  { id: 'profiles', label: 'Profiles' },
 ]

@@ -1,719 +1,744 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { PROFILE, MENU } from './NokiaData'
+import { useState, useEffect, useRef, useImperativeHandle, useCallback } from 'react'
+import { PROFILE, MENU, LINKS, PixelIcon } from './NokiaData'
 import { playBeep, playSnakeEat, playSnakeCrash, playStartupChime, playSaulTheme } from './audioUtils'
 import bootLogo from '../assets/boot_logo.png'
 import idleLogo from '../assets/idle_logo.png'
 
-export default function NokiaUI() {
+const GRID_W = 18
+const GRID_H = 9
+const BOOT_MS = 3200
+const BACKLIGHT_MS = 15000
+const SCREENSAVER_MS = 30000
+const BEST_KEY = 'nokia-desk:snake-best'
+
+const OPPOSITE = { up: 'down', down: 'up', left: 'right', right: 'left' }
+const DIRECTION_KEYS = { up: 'up', down: 'down', left: 'left', right: 'right', 2: 'up', 8: 'down', 4: 'left', 6: 'right' }
+const STEP = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }
+
+const LISTS = {
+  contacts: { title: 'Phonebook', items: PROFILE.contacts.map((c) => ({ title: c.label, sub: c.value, url: c.url })) },
+  projects: { title: 'Projects', items: PROFILE.projects.map((p) => ({ title: p.name, sub: p.desc, url: p.url })) },
+  desks: { title: 'Desks', items: PROFILE.desks.map((d) => ({ title: d.label, sub: d.value, url: d.url, sameTab: d.sameTab })) },
+  profiles: { title: 'Profiles', items: [{ title: 'General', sub: 'Keypad tones on', value: true }, { title: 'Silent', sub: 'All tones off', value: false }] },
+}
+
+const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+
+const VFS = {
+  'about.txt': PROFILE.about.join(' '),
+  'contact.txt': PROFILE.contacts.map((c) => `${c.label}: ${c.url.replace(/^mailto:/, '')}`).join('\n'),
+  'resume.txt': `Resume: ${LINKS.resume}\nType "open resume".`,
+  projects: Object.fromEntries(PROFILE.projects.slice(0, -1).map((p) => [slug(p.name), `${p.name}: ${p.desc}\n${p.url}`])),
+}
+
+const TERM_WELCOME = [{ type: 'output', text: 'Nokia OS v1.0\nType "help".' }]
+
+function readBest() {
+  try {
+    return Number(window.localStorage.getItem(BEST_KEY)) || 0
+  } catch {
+    return 0
+  }
+}
+
+function writeBest(value) {
+  try {
+    window.localStorage.setItem(BEST_KEY, String(value))
+  } catch {
+    // Storage can be unavailable in private windows.
+  }
+}
+
+function newSnakeGame() {
+  const body = [{ x: 5, y: 4 }, { x: 4, y: 4 }, { x: 3, y: 4 }]
+  return { body, dir: 'right', queue: [], food: spawnFood(body), score: 0 }
+}
+
+function spawnFood(body) {
+  const taken = new Set(body.map((s) => `${s.x},${s.y}`))
+  const free = []
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      if (!taken.has(`${x},${y}`)) free.push({ x, y })
+    }
+  }
+  return free.length ? free[Math.floor(Math.random() * free.length)] : null
+}
+
+function formatTime(d) {
+  const h = d.getHours()
+  const m = String(d.getMinutes()).padStart(2, '0')
+  return `${String(h).padStart(2, '0')}:${m}`
+}
+
+// LCD controls are mouse and touch shortcuts. Keyboard users drive the phone through its keys,
+// so these never take focus (a focused row would otherwise swallow Enter).
+const noFocus = { tabIndex: -1, onMouseDown: (e) => e.preventDefault() }
+
+function openLink(url, sameTab) {
+  if (url.startsWith('mailto:') || sameTab) {
+    window.location.assign(url)
+    return false
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
+  return true
+}
+
+export default function NokiaUI({ ref, sound, onSoundChange, onPowerChange }) {
   const [screen, setScreen] = useState('off')
   const [menuIdx, setMenuIdx] = useState(0)
-  const [timeStr, setTimeStr] = useState('')
-  
+  const [listIdx, setListIdx] = useState(0)
+  const [listReturn, setListReturn] = useState('menu')
+  const [clock, setClock] = useState(() => formatTime(new Date()))
   const [dialNumber, setDialNumber] = useState('')
+  const [notice, setNotice] = useState(null)
+  const [activity, setActivity] = useState(0)
+  const [backlight, setBacklight] = useState(false)
+  const [matrix, setMatrix] = useState(false)
 
-  const lastInteractionRef = useRef(Date.now());
+  // Snake
+  const gameRef = useRef(null)
+  if (!gameRef.current) gameRef.current = newSnakeGame()
+  const [snakeStatus, setSnakeStatus] = useState('ready')
+  const [, setFrame] = useState(0)
+  const [best, setBest] = useState(readBest)
+  const overAtRef = useRef(0)
 
-  // States for sub-apps
-  const [activeItemIdx, setActiveItemIdx] = useState(0)
-  const scrollRef = useRef(null)
+  // Terminal
+  const [termHistory, setTermHistory] = useState(TERM_WELCOME)
+  const [termCwd, setTermCwd] = useState('~')
+  const [termInput, setTermInput] = useState('')
+  const [cmdLog, setCmdLog] = useState([])
+  const [cmdCursor, setCmdCursor] = useState(-1)
+  const termScrollRef = useRef(null)
+  const termInputRef = useRef(null)
 
-  // Snake Game States
-  const gridW = 15;
-  const gridH = 10;
-  const snakeRef = useRef([{x: 7, y: 5}]);
-  const foodRef = useRef({x: 10, y: 5});
-  const scoreRef = useRef(0);
-  const [gameState, setGameState] = useState('IDLE'); // IDLE, PLAYING, GAMEOVER
-  const directionRef = useRef('RIGHT');
-  const lastMoveDirectionRef = useRef('RIGHT');
-  const [, setRenderTick] = useState(0);
-
-  // GitHub Projects State
-  const [projects, setProjects] = useState(PROFILE.projects);
-
-  // Terminal App States
-  const [termHistory, setTermHistory] = useState([{ type: 'output', text: 'Nokia OS v1.0\nType "help" for commands.' }]);
-  const [termCwd, setTermCwd] = useState('~');
-  const [termInput, setTermInput] = useState('');
-  const termScrollRef = useRef(null);
-
-  const openExternal = useCallback((url) => {
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }, []);
-  
-  const VFS = useRef({
-    '~': {
-      'about.txt': PROFILE.about.join(' '),
-      'contact.txt': PROFILE.contacts.map(c => `${c.label}: ${c.value}`).join('\n'),
-      'projects': {}
-    }
-  });
+  const listScrollRef = useRef(null)
+  const messageScrollRef = useRef(null)
 
   useEffect(() => {
-    if (projects.length > 0) {
-      VFS.current['~']['projects'] = projects.reduce((acc, p) => {
-        acc[p.name.toLowerCase().replace(/[^a-z0-9]/g, '-')] = p.desc || p.content;
-        return acc;
-      }, {});
+    onPowerChange?.(screen !== 'off')
+  }, [screen, onPowerChange])
+
+  // Clock, aligned to the start of each minute.
+  useEffect(() => {
+    let timer
+    const tick = () => {
+      const now = new Date()
+      setClock(formatTime(now))
+      timer = setTimeout(tick, 60000 - (now.getSeconds() * 1000 + now.getMilliseconds()) + 50)
     }
-  }, [projects]);
+    tick()
+    return () => clearTimeout(timer)
+  }, [])
 
-  const handleTerminalCommand = useCallback((e) => {
-    if (e.key === 'Enter') {
-      const cmd = termInput.trim();
-      setTermInput('');
-      
-      let newHistory = [...termHistory, { type: 'input', text: `${termCwd} > ${cmd}` }];
-      
-      if (!cmd) {
-        setTermHistory(newHistory);
-        return;
-      }
-      
-      const args = cmd.split(' ').filter(Boolean);
-      const program = args[0].toLowerCase();
-      
-      let currentDir = VFS.current['~'];
-      if (termCwd !== '~') {
-        const pathParts = termCwd.replace('~/', '').split('/');
-        for (const part of pathParts) {
-          if (part && currentDir[part]) currentDir = currentDir[part];
-        }
-      }
+  // Timed screens.
+  useEffect(() => {
+    let timer
+    if (screen === 'boot') timer = setTimeout(() => setScreen('idle'), BOOT_MS)
+    if (screen === 'calling') {
+      timer = setTimeout(() => {
+        setNotice({ title: 'No SIM card', text: 'This phone lives in a browser', next: 'idle' })
+        setScreen('notice')
+      }, 2000)
+    }
+    if (screen === 'notice') timer = setTimeout(() => setScreen(notice?.next || 'idle'), 1800)
+    return () => clearTimeout(timer)
+  }, [screen, notice])
 
-      if (program === 'help') {
-        newHistory.push({ type: 'output', text: 'Commands: ls, cd, cat, clear, help, matrix, saul' });
-      } else if (program === 'matrix') {
-        newHistory.push({ type: 'output', text: 'Wake up, Neo...' });
-        const screenNode = document.getElementById('nokia-ui-screen-inner');
-        if (screenNode) {
-          screenNode.classList.add('matrix-mode');
-          setTimeout(() => screenNode.classList.remove('matrix-mode'), 5000);
-        }
-      } else if (program === 'saul') {
-        newHistory.push({ type: 'output', text: 'Better Call Saul!\n\n      _.-""""`-.\n    ,\'      _  _`.\n   /      (o)(o) \\\n  |        (  )   |\n  |        _||_   |\n   \\      \'===\'  /\n    \'.          .\'\n      `-......-\'\n' });
-        playSaulTheme();
-      } else if (program === 'clear') {
-        newHistory = [];
-      } else if (program === 'ls') {
-        const items = Object.keys(currentDir).map(k => typeof currentDir[k] === 'object' ? `${k}/` : k);
-        newHistory.push({ type: 'output', text: items.length > 0 ? items.join('  ') : '(empty)' });
-      } else if (program === 'cd') {
-        const target = args[1];
-        if (!target || target === '~' || target === '/') {
-          setTermCwd('~');
-        } else if (target === '..') {
-          if (termCwd !== '~') {
-            const parts = termCwd.split('/');
-            parts.pop();
-            setTermCwd(parts.length > 0 ? parts.join('/') : '~');
+  // Screensaver only from the idle screen, restarted by every key press.
+  useEffect(() => {
+    if (screen !== 'idle') return undefined
+    const timer = setTimeout(() => setScreen('screensaver'), SCREENSAVER_MS)
+    return () => clearTimeout(timer)
+  }, [screen, activity])
+
+  // Backlight turns on with any key and fades after a quiet period, like the real phone.
+  useEffect(() => {
+    if (!activity) return undefined
+    setBacklight(true)
+    const timer = setTimeout(() => setBacklight(false), BACKLIGHT_MS)
+    return () => clearTimeout(timer)
+  }, [activity])
+
+  useEffect(() => {
+    if (!matrix) return undefined
+    const timer = setTimeout(() => setMatrix(false), 5000)
+    return () => clearTimeout(timer)
+  }, [matrix])
+
+  // Snake engine. Speed rises gently with length.
+  useEffect(() => {
+    if (screen !== 'snake' || snakeStatus !== 'playing') return undefined
+    let timer
+    const step = () => {
+      const g = gameRef.current
+      if (g.queue.length) g.dir = g.queue.shift()
+      const [dx, dy] = STEP[g.dir]
+      const head = { x: g.body[0].x + dx, y: g.body[0].y + dy }
+      const eats = g.food && head.x === g.food.x && head.y === g.food.y
+      const rest = eats ? g.body : g.body.slice(0, -1)
+      const hitWall = head.x < 0 || head.x >= GRID_W || head.y < 0 || head.y >= GRID_H
+      if (hitWall || rest.some((s) => s.x === head.x && s.y === head.y)) {
+        playSnakeCrash()
+        overAtRef.current = Date.now()
+        setBest((b) => {
+          if (g.score > b) {
+            writeBest(g.score)
+            return g.score
           }
-        } else if (currentDir[target] && typeof currentDir[target] === 'object') {
-          setTermCwd(termCwd === '~' ? `~/${target}` : `${termCwd}/${target}`);
-        } else {
-          newHistory.push({ type: 'output', text: `cd: ${target}: No such directory` });
-        }
-      } else if (program === 'cat') {
-        const target = args[1];
-        if (!target) {
-          newHistory.push({ type: 'output', text: 'cat: missing operand' });
-        } else if (currentDir[target] && typeof currentDir[target] === 'string') {
-          newHistory.push({ type: 'output', text: currentDir[target] });
-        } else if (currentDir[target] && typeof currentDir[target] === 'object') {
-          newHistory.push({ type: 'output', text: `cat: ${target}: Is a directory` });
-        } else {
-          newHistory.push({ type: 'output', text: `cat: ${target}: No such file or directory` });
-        }
-      } else {
-        newHistory.push({ type: 'output', text: `Command not found: ${program}` });
+          return b
+        })
+        setSnakeStatus('over')
+        return
       }
-      
-      setTermHistory(newHistory);
+      g.body = [head, ...rest]
+      if (eats) {
+        g.score += 1
+        g.food = spawnFood(g.body)
+        playSnakeEat()
+      }
+      setFrame((f) => f + 1)
+      timer = setTimeout(step, Math.max(85, 210 - g.body.length * 5))
     }
-  }, [termInput, termHistory, termCwd]);
-
-  useEffect(() => {
-    if (screen === 'terminal' && termScrollRef.current) {
-      termScrollRef.current.scrollTop = termScrollRef.current.scrollHeight;
+    timer = setTimeout(step, Math.max(85, 210 - gameRef.current.body.length * 5))
+    const pause = () => setSnakeStatus('paused')
+    const onVisibility = () => document.hidden && pause()
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('blur', pause)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('blur', pause)
     }
-  }, [termHistory, screen]);
+  }, [screen, snakeStatus])
+
+  // Keep the selected list row visible without scrolling the page.
+  useEffect(() => {
+    const box = listScrollRef.current
+    if (!box) return
+    const row = box.querySelector(`[data-row="${listIdx}"]`)
+    if (!row) return
+    if (row.offsetTop < box.scrollTop) box.scrollTop = row.offsetTop
+    else if (row.offsetTop + row.offsetHeight > box.scrollTop + box.clientHeight) {
+      box.scrollTop = row.offsetTop + row.offsetHeight - box.clientHeight
+    }
+  }, [listIdx, screen])
 
   useEffect(() => {
-    fetch('https://api.github.com/users/tanmayhutt/repos?sort=updated')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          const myProjects = data.filter(repo => !repo.fork);
-          const formatted = myProjects.map(repo => ({
-            name: repo.name,
-            desc: repo.description || '',
-            url: repo.html_url,
-            content: `Language: ${repo.language || 'N/A'}\nStars: ${repo.stargazers_count}\nURL: ${repo.html_url}`
-          }));
-          if (formatted.length > 0) {
-            setProjects(formatted);
-          }
-        }
-      })
-      .catch(err => console.error('Failed to fetch github repos', err));
-  }, []);
-
-  useEffect(() => {
-    if (screen === 'boot') {
-      playStartupChime();
-      const timer = setTimeout(() => setScreen('idle'), 3500)
-      return () => clearTimeout(timer)
+    if (screen === 'terminal') {
+      termInputRef.current?.focus({ preventScroll: true })
     }
   }, [screen])
 
   useEffect(() => {
-    if (screen === 'projects' || screen === 'contacts') {
-      const activeEl = document.getElementById(`list-item-${activeItemIdx}`);
-      if (activeEl) {
-        activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }
-  }, [activeItemIdx, screen])
+    if (termScrollRef.current) termScrollRef.current.scrollTop = termScrollRef.current.scrollHeight
+  }, [termHistory, screen])
 
-  useEffect(() => {
-    const updateTime = () => {
-      const d = new Date()
-      let h = d.getHours(), m = d.getMinutes().toString().padStart(2, '0')
-      const ap = h >= 12 ? 'PM' : 'AM'
-      setTimeStr(`${h%12||12}:${m}${ap}`)
-    }
-    updateTime()
-    const t = setInterval(updateTime, 60000)
-    return () => clearInterval(t)
+  const showNotice = useCallback((title, text, next) => {
+    setNotice({ title, text, next })
+    setScreen('notice')
   }, [])
 
-  // Screensaver Logic
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (screen !== 'off' && screen !== 'boot' && screen !== 'screensaver' && (Date.now() - lastInteractionRef.current > 30000)) {
-        setScreen('screensaver');
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [screen]);
+  const openItem = useCallback(
+    (item, next) => {
+      const newTab = openLink(item.url, item.sameTab)
+      if (newTab) showNotice('Opened', item.title, next)
+    },
+    [showNotice],
+  )
 
-  // Snake Game Engine
-  useEffect(() => {
-    if (screen !== 'snake' || gameState !== 'PLAYING') return;
-    
-    const tick = () => {
-      const prev = snakeRef.current;
-      const head = { ...prev[0] };
-      const currentDir = directionRef.current;
-      lastMoveDirectionRef.current = currentDir;
-      
-      if (currentDir === 'UP') head.y -= 1;
-      if (currentDir === 'DOWN') head.y += 1;
-      if (currentDir === 'LEFT') head.x -= 1;
-      if (currentDir === 'RIGHT') head.x += 1;
-
-      // Collision with walls or self
-      if (head.x < 0 || head.x >= gridW || head.y < 0 || head.y >= gridH || prev.some(seg => seg.x === head.x && seg.y === head.y)) {
-        playSnakeCrash();
-        setGameState('GAMEOVER');
-        return;
-      }
-
-      const newSnake = [head, ...prev];
-      const currentFood = foodRef.current;
-      
-      if (head.x === currentFood.x && head.y === currentFood.y) {
-        scoreRef.current += 10;
-        playSnakeEat();
-        // Spawn new food
-        let newFood;
-        while (true) {
-          newFood = {
-            x: Math.floor(Math.random() * gridW),
-            y: Math.floor(Math.random() * gridH)
-          };
-          if (!newSnake.some(s => s.x === newFood.x && s.y === newFood.y)) break;
-        }
-        foodRef.current = newFood;
-      } else {
-        newSnake.pop();
-      }
-      
-      snakeRef.current = newSnake;
-      setRenderTick(t => t + 1);
-    };
-
-    const interval = setInterval(tick, 200); // Constant speed 200ms
-    return () => clearInterval(interval);
-  }, [screen, gameState]);
-
-  const handleOpenApp = useCallback((appId) => {
-    setScreen(appId)
-    setActiveItemIdx(0)
-    if (scrollRef.current) scrollRef.current.scrollTop = 0;
-  }, [])
-
-  const handleKeyDown = useCallback((e) => {
-    lastInteractionRef.current = Date.now();
-
-    if (screen === 'off') {
-      setScreen('boot');
-      return;
-    }
-
-    if (screen === 'screensaver') {
-      setScreen('idle');
-      return;
-    }
-
-    // Only beep for printable characters or control keys we use
-    if (e.key.length === 1 || ['Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace', 'Escape'].includes(e.key)) {
-      playBeep();
-    }
-
-    if (screen === 'dialing') {
-      if (e.key === 'Escape' || e.key === 'Backspace') {
-        setDialNumber(prev => {
-          const next = prev.slice(0, -1);
-          if (next.length === 0) setScreen('idle');
-          return next;
-        });
-      } else if (e.key === 'Enter') {
-        window.open(`tel:${dialNumber}`, '_self');
-        setScreen('idle');
-        setDialNumber('');
-      } else if (/^[0-9*#]$/.test(e.key)) {
-        if (dialNumber.length < 15) setDialNumber(prev => prev + e.key);
-      }
-      return;
-    }
-
-    if (screen === 'terminal') {
-      if (e.key === 'Escape') {
-        setScreen('menu');
-        e.preventDefault();
-      }
-      return;
-    }
-
-    // Prevent default scrolling for arrow keys
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-      e.preventDefault();
-    }
-
-    if (screen === 'boot') return
-
-    if (screen === 'idle') {
-      if (e.key === 'Enter') {
-        setScreen('menu')
-        setMenuIdx(0)
-      } else if (/^[0-9*#]$/.test(e.key)) {
-        setDialNumber(e.key);
-        setScreen('dialing');
-      }
-      return
-    }
-
-    if (screen === 'menu') {
-      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') setMenuIdx(prev => (prev - 1 + MENU.length) % MENU.length)
-      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') setMenuIdx(prev => (prev + 1) % MENU.length)
-      if (e.key === 'Enter') {
-        const selected = MENU[menuIdx].id;
-        if (selected === 'github') {
-          openExternal('https://github.com/tanmayhutt');
-          setScreen('idle');
-        } else if (selected === 'instagram') {
-          openExternal('https://www.instagram.com/tanmayhutt/');
-          setScreen('idle');
-        } else {
-          handleOpenApp(selected);
-        }
-      }
-      if (e.key === 'Escape' || e.key === 'Backspace') setScreen('idle')
-      return
-    }
-
-    // Generic list navigation (Contacts, Projects)
-    if (screen === 'contacts' || screen === 'projects') {
-      const listLen = screen === 'contacts' ? PROFILE.contacts.length : projects.length
-      if (e.key === 'ArrowUp') setActiveItemIdx(prev => Math.max(0, prev - 1))
-      if (e.key === 'ArrowDown') setActiveItemIdx(prev => Math.min(listLen - 1, prev + 1))
-      if (e.key === 'Enter') {
-        if (screen === 'contacts' && PROFILE.contacts[activeItemIdx]) {
-          openExternal(PROFILE.contacts[activeItemIdx].url)
-        } else if (screen === 'projects' && projects[activeItemIdx] && projects[activeItemIdx].url) {
-          openExternal(projects[activeItemIdx].url)
-        }
-      }
-      if (e.key === 'Escape' || e.key === 'Backspace') setScreen('menu')
-      return
-    }
-
-    // Scrollable text view (Messages/About)
-    if (screen === 'messages') {
-      if (e.key === 'ArrowUp' && scrollRef.current) scrollRef.current.scrollBy({ top: -20, behavior: 'smooth' })
-      if (e.key === 'ArrowDown' && scrollRef.current) scrollRef.current.scrollBy({ top: 20, behavior: 'smooth' })
-      if (e.key === 'Escape' || e.key === 'Backspace') setScreen('menu')
-      return
-    }
-
-    if (screen === 'snake') {
-      if (gameState === 'IDLE' || gameState === 'GAMEOVER') {
-        if (e.key === 'Enter' || ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', '2', '8', '4', '6'].includes(e.key)) {
-          snakeRef.current = [{x: 7, y: 5}];
-          foodRef.current = {x: 10, y: 5};
-          scoreRef.current = 0;
-          
-          let initialDir = 'RIGHT';
-          if (e.key === 'ArrowUp' || e.key === '2') initialDir = 'UP';
-          if (e.key === 'ArrowDown' || e.key === '8') initialDir = 'DOWN';
-          if (e.key === 'ArrowLeft' || e.key === '4') initialDir = 'LEFT';
-          if (e.key === 'ArrowRight' || e.key === '6') initialDir = 'RIGHT';
-          
-          directionRef.current = initialDir;
-          lastMoveDirectionRef.current = initialDir;
-          
-          setGameState('PLAYING');
-          setRenderTick(t => t + 1);
-        }
-      } else if (gameState === 'PLAYING') {
-        const lastMove = lastMoveDirectionRef.current;
-        if ((e.key === 'ArrowUp' || e.key === '2') && lastMove !== 'DOWN') directionRef.current = 'UP';
-        if ((e.key === 'ArrowDown' || e.key === '8') && lastMove !== 'UP') directionRef.current = 'DOWN';
-        if ((e.key === 'ArrowLeft' || e.key === '4') && lastMove !== 'RIGHT') directionRef.current = 'LEFT';
-        if ((e.key === 'ArrowRight' || e.key === '6') && lastMove !== 'LEFT') directionRef.current = 'RIGHT';
-      }
-      if (e.key === 'Escape' || e.key === 'Backspace') {
-        setScreen('menu');
-        setGameState('IDLE');
-      }
-      return
-    }
-
-    if (e.key === 'Escape' || e.key === 'Backspace') setScreen('idle')
-  }, [screen, menuIdx, activeItemIdx, handleOpenApp, gameState, projects, dialNumber])
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleKeyDown])
-
-  if (screen === 'off') {
-    return (
-      <div 
-        className="w-full h-full flex flex-col items-center justify-center p-4 cursor-pointer"
-        onClick={() => setScreen('boot')}
-      >
-      </div>
-    )
+  const openList = (id, from) => {
+    setListIdx(id === 'profiles' ? (sound ? 0 : 1) : 0)
+    setListReturn(from)
+    setScreen(id)
   }
 
-  if (screen === 'boot') {
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center p-4 animate-[bootFade_3.5s_ease-in-out_forwards]">
-        <img 
-          src={bootLogo} 
-          alt="Boot Logo"
-          className="w-full h-full object-contain filter grayscale contrast-200 mix-blend-multiply opacity-90"
-          style={{ imageRendering: 'pixelated' }}
-        />
+  const openApp = (id) => {
+    if (id === 'resume') {
+      openItem({ url: LINKS.resume, title: 'Resume' }, 'menu')
+    } else if (LISTS[id]) {
+      openList(id, 'menu')
+    } else if (id === 'messages') {
+      setScreen('messages')
+    } else {
+      setScreen(id)
+    }
+  }
+
+  const startSnake = (dir) => {
+    gameRef.current = newSnakeGame()
+    if (dir && dir !== 'left') gameRef.current.dir = dir
+    setSnakeStatus('playing')
+    setFrame((f) => f + 1)
+  }
+
+  const queueDirection = (dir) => {
+    const g = gameRef.current
+    const last = g.queue.length ? g.queue[g.queue.length - 1] : g.dir
+    if (dir === last || dir === OPPOSITE[last] || g.queue.length >= 2) return
+    g.queue.push(dir)
+  }
+
+  const runCommand = (raw) => {
+    const cmd = raw.trim()
+    let history = [...termHistory, { type: 'input', text: `${termCwd}> ${cmd}` }]
+    const out = (text) => history.push({ type: 'output', text })
+    if (cmd) {
+      setCmdLog((log) => [...log, cmd].slice(-20))
+    }
+    setCmdCursor(-1)
+    setTermInput('')
+    if (!cmd) {
+      setTermHistory(history)
+      return
+    }
+    const [program, target] = cmd.split(/\s+/)
+    const dir = termCwd === '~' ? VFS : VFS[termCwd.replace('~/', '')] || VFS
+    switch (program.toLowerCase()) {
+      case 'help':
+        out('ls cd cat open\nwhoami date clear\nmatrix saul exit')
+        break
+      case 'whoami':
+        out(`${PROFILE.name} (${PROFILE.operator})`)
+        break
+      case 'date':
+        out(new Date().toDateString())
+        break
+      case 'matrix':
+        out('Wake up, Neo...')
+        setMatrix(true)
+        break
+      case 'saul':
+        out("It's all good, man.")
+        playSaulTheme()
+        break
+      case 'clear':
+        history = []
+        break
+      case 'exit':
+        setTermHistory(history)
+        setScreen('menu')
+        return
+      case 'ls': {
+        const names = Object.keys(dir).map((k) => (typeof dir[k] === 'object' ? `${k}/` : k))
+        out(names.join('\n') || '(empty)')
+        break
+      }
+      case 'cd':
+        if (!target || target === '~' || target === '/' || target === '..') setTermCwd('~')
+        else if (termCwd === '~' && typeof VFS[target.replace(/\/$/, '')] === 'object') setTermCwd(`~/${target.replace(/\/$/, '')}`)
+        else out(`cd: ${target}: no such dir`)
+        break
+      case 'cat':
+        if (!target) out('cat: missing file')
+        else if (typeof dir[target] === 'string') out(dir[target])
+        else if (dir[target]) out(`cat: ${target}: is a dir`)
+        else out(`cat: ${target}: not found`)
+        break
+      case 'open': {
+        const name = slug(target || '')
+        const project = PROFILE.projects.find((p) => slug(p.name) === name)
+        const contact = PROFILE.contacts.find((c) => slug(c.label) === name)
+        if (name === 'resume') {
+          openLink(LINKS.resume)
+          out('Opened resume')
+        } else if (project || contact) {
+          const item = project || contact
+          openLink(item.url)
+          out(`Opened ${project ? project.name : contact.label}`)
+        } else {
+          out('open: try "open blend"\nor "open github"')
+        }
+        break
+      }
+      default:
+        out(`${program}: not found`)
+    }
+    setTermHistory(history)
+  }
+
+  const press = (key, raw) => {
+    setActivity((n) => n + 1)
+    if (screen === 'off') {
+      playStartupChime()
+      setScreen('boot')
+      return
+    }
+    if (screen === 'boot') return
+    playBeep()
+
+    if (screen === 'screensaver') {
+      setScreen('idle')
+      return
+    }
+
+    const isDigit = /^[0-9*#]$/.test(key)
+
+    switch (screen) {
+      case 'idle':
+        if (key === 'navi') {
+          setMenuIdx(0)
+          setScreen('menu')
+        } else if (key === 'down' || key === 'up') {
+          openList('contacts', 'idle')
+        } else if (isDigit) {
+          setDialNumber(key)
+          setScreen('dialing')
+        }
+        return
+
+      case 'menu':
+        if (key === 'up' || key === 'left') setMenuIdx((i) => (i - 1 + MENU.length) % MENU.length)
+        else if (key === 'down' || key === 'right') setMenuIdx((i) => (i + 1) % MENU.length)
+        else if (key === 'navi') openApp(MENU[menuIdx].id)
+        else if (key === 'c') setScreen('idle')
+        else if (/^[1-9]$/.test(key) && MENU[Number(key) - 1]) {
+          setMenuIdx(Number(key) - 1)
+          openApp(MENU[Number(key) - 1].id)
+        }
+        return
+
+      case 'contacts':
+      case 'projects':
+      case 'desks':
+      case 'profiles': {
+        const items = LISTS[screen].items
+        if (key === 'up' || key === 'left') setListIdx((i) => (i - 1 + items.length) % items.length)
+        else if (key === 'down' || key === 'right') setListIdx((i) => (i + 1) % items.length)
+        else if (key === 'c') setScreen(listReturn)
+        else if (key === 'navi') {
+          const item = items[listIdx]
+          if (screen === 'profiles') {
+            onSoundChange?.(item.value)
+            showNotice(item.title, 'Profile active', 'menu')
+          } else {
+            openItem(item, screen)
+          }
+        }
+        return
+      }
+
+      case 'messages': {
+        const box = messageScrollRef.current
+        if (key === 'up' && box) box.scrollTop -= box.clientHeight * 0.6
+        else if (key === 'down' && box) box.scrollTop += box.clientHeight * 0.6
+        else if (key === 'c' || key === 'navi') setScreen('menu')
+        return
+      }
+
+      case 'snake': {
+        const dir = DIRECTION_KEYS[key]
+        if (key === 'c') {
+          if (snakeStatus === 'playing') setSnakeStatus('paused')
+          setScreen('menu')
+          return
+        }
+        if (snakeStatus === 'playing') {
+          if (dir) queueDirection(dir)
+          else if (key === 'navi' || key === '5') setSnakeStatus('paused')
+        } else if (snakeStatus === 'paused') {
+          if (dir || key === 'navi' || key === '5') setSnakeStatus('playing')
+        } else if (snakeStatus === 'ready') {
+          if (dir || key === 'navi' || key === '5') startSnake(dir)
+        } else if (snakeStatus === 'over' && Date.now() - overAtRef.current > 600) {
+          if (key === 'navi' || key === '5') startSnake()
+        }
+        return
+      }
+
+      case 'terminal':
+        if (key === 'navi') runCommand(termInput)
+        else if (key === 'c') {
+          if (raw === 'Escape' || !termInput) setScreen('menu')
+          else setTermInput((v) => v.slice(0, -1))
+        } else if (key === 'up' && cmdLog.length) {
+          const next = cmdCursor === -1 ? cmdLog.length - 1 : Math.max(0, cmdCursor - 1)
+          setCmdCursor(next)
+          setTermInput(cmdLog[next])
+        } else if (key === 'down' && cmdCursor !== -1) {
+          const next = cmdCursor + 1
+          setCmdCursor(next >= cmdLog.length ? -1 : next)
+          setTermInput(next >= cmdLog.length ? '' : cmdLog[next])
+        } else if (isDigit) {
+          setTermInput((v) => v + key)
+        }
+        if (raw && raw !== 'pad') termInputRef.current?.focus({ preventScroll: true })
+        return
+
+      case 'dialing':
+        if (key === 'c') {
+          const next = dialNumber.slice(0, -1)
+          setDialNumber(next)
+          if (!next) setScreen('idle')
+        } else if (key === 'navi') {
+          setScreen('calling')
+        } else if (isDigit && dialNumber.length < 15) {
+          setDialNumber((n) => n + key)
+        }
+        return
+
+      case 'calling':
+        if (key === 'c' || key === 'navi') {
+          setDialNumber('')
+          setScreen('idle')
+        }
+        return
+
+      case 'notice':
+        setScreen(notice?.next || 'idle')
+        return
+
+      default:
+    }
+  }
+
+  const pressRef = useRef(press)
+  useEffect(() => {
+    pressRef.current = press
+  })
+  useImperativeHandle(ref, () => ({ press: (key, raw) => pressRef.current(key, raw) }), [])
+
+  const tap = (key) => (e) => {
+    e.stopPropagation()
+    pressRef.current(key)
+  }
+
+  // --- Rendering -------------------------------------------------------
+
+  const lcdClass = `lcd ${backlight && screen !== 'off' ? 'is-lit' : ''} ${screen === 'off' ? 'is-off' : ''} ${matrix ? 'matrix-mode' : ''}`
+
+  const softLabel = {
+    idle: 'Menu',
+    menu: 'Select',
+    contacts: 'Open',
+    projects: 'Open',
+    desks: 'Open',
+    profiles: 'Select',
+    messages: 'Back',
+    terminal: 'Run',
+    dialing: 'Call',
+    calling: 'End',
+    notice: 'OK',
+    snake: { ready: 'Start', playing: 'Pause', paused: 'Continue', over: 'Again' }[snakeStatus],
+  }[screen]
+
+  const srTitle = {
+    off: 'Phone is off. Press any key to power on.',
+    boot: 'Starting',
+    idle: `Idle screen, ${clock}`,
+    menu: `Menu, ${MENU[menuIdx].label}, ${menuIdx + 1} of ${MENU.length}`,
+    messages: 'Message from Tanmay',
+    snake: `Snake, ${snakeStatus === 'over' ? 'game over' : snakeStatus}`,
+    terminal: 'Terminal',
+    dialing: 'Dialing',
+    calling: 'Calling',
+    screensaver: 'Screensaver',
+    notice: notice ? `${notice.title}. ${notice.text}` : '',
+  }[screen]
+  const srStatus = LISTS[screen]
+    ? `${LISTS[screen].title}, ${LISTS[screen].items[listIdx]?.title}, ${listIdx + 1} of ${LISTS[screen].items.length}`
+    : srTitle
+
+  let body = null
+
+  if (screen === 'off') {
+    body = (
+      <button {...noFocus} type="button" className="lcd-off-hint" onClick={tap('navi')} aria-label="Power on the phone">
+        <PixelIcon name="power" className="lcd-off-icon" />
+        <span>Press any key</span>
+      </button>
+    )
+  } else if (screen === 'boot') {
+    body = (
+      <div className="lcd-boot">
+        <img src={bootLogo} alt="Nokia start-up screen" />
       </div>
     )
+  } else if (screen === 'idle') {
+    body = (
+      <div className="lcd-idle">
+        <div className="lcd-bars" aria-hidden="true">
+          {[4.6, 3.4, 2.3, 1.3].map((w) => <i key={w} style={{ width: `${w}cqw` }} />)}
+          <svg viewBox="0 0 10 12" className="lcd-status-icon">
+            <path d="M5,12 L5,4 M5,4 L0.5,0 M5,4 L9.5,0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="square" />
+          </svg>
+        </div>
+        <div className="lcd-idle-center">
+          <div className="lcd-idle-top">
+            <span>{sound ? '' : 'Silent'}</span>
+            <span>{clock}</span>
+          </div>
+          <img src={idleLogo} alt="" className="lcd-idle-logo" />
+          <div className="lcd-idle-operator">{PROFILE.operator}</div>
+        </div>
+        <div className="lcd-bars is-right" aria-hidden="true">
+          {[4.6, 3.4, 2.3, 1.3].map((w) => <i key={w} style={{ width: `${w}cqw` }} />)}
+          <svg viewBox="0 0 8 12" className="lcd-status-icon">
+            <rect x="0.8" y="1.8" width="6.4" height="9.4" fill="none" stroke="currentColor" strokeWidth="1.6" />
+            <rect x="2.5" y="0" width="3" height="1.8" fill="currentColor" />
+          </svg>
+        </div>
+      </div>
+    )
+  } else if (screen === 'menu') {
+    const item = MENU[menuIdx]
+    body = (
+      <div className="lcd-menu">
+        <div className="lcd-head">
+          <span>{item.label}</span>
+          <span>{menuIdx + 1}</span>
+        </div>
+        <div className="lcd-menu-body">
+          <button {...noFocus} type="button" className="lcd-menu-icon" onClick={tap('navi')} aria-label={`Open ${item.label}`}>
+            <PixelIcon name={item.id} />
+          </button>
+          <div className="lcd-scrollbar" aria-hidden="true">
+            <i style={{ '--p': menuIdx / (MENU.length - 1) }} />
+          </div>
+        </div>
+      </div>
+    )
+  } else if (LISTS[screen]) {
+    const { title, items } = LISTS[screen]
+    body = (
+      <div className="lcd-list">
+        <div className="lcd-head">
+          <span>{title}</span>
+          <span>{listIdx + 1}/{items.length}</span>
+        </div>
+        <div className="lcd-list-rows" ref={listScrollRef}>
+          {items.map((item, i) => {
+            const active = i === listIdx
+            const chosen = screen === 'profiles' && item.value === sound
+            return (
+              <button
+                {...noFocus}
+                type="button"
+                key={item.title}
+                data-row={i}
+                className={`lcd-row ${active ? 'is-active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setListIdx(i)
+                  setActivity((n) => n + 1)
+                  if (screen === 'profiles') {
+                    onSoundChange?.(item.value)
+                  } else {
+                    openItem(item, screen)
+                  }
+                }}
+              >
+                <span className="lcd-row-title">
+                  {item.title}
+                  {screen === 'profiles' && <span className="lcd-radio">{chosen ? <b /> : null}</span>}
+                </span>
+                {active && <span className="lcd-row-sub">{item.sub}</span>}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    )
+  } else if (screen === 'messages') {
+    body = (
+      <div className="lcd-list">
+        <div className="lcd-head">
+          <span>Inbox</span>
+          <span>1/1</span>
+        </div>
+        <div className="lcd-message" ref={messageScrollRef}>
+          <p className="lcd-message-from">From: {PROFILE.name}</p>
+          {PROFILE.about.map((p) => <p key={p}>{p}</p>)}
+        </div>
+      </div>
+    )
+  } else if (screen === 'snake') {
+    const g = gameRef.current
+    const cells = new Set(g.body.map((s) => `${s.x},${s.y}`))
+    const headKey = `${g.body[0].x},${g.body[0].y}`
+    body = (
+      <div className="lcd-snake">
+        <div className="lcd-snake-score">
+          <span>{String(g.score).padStart(4, '0')}</span>
+          <span>Best {best}</span>
+        </div>
+        <div className="lcd-snake-board" style={{ gridTemplateColumns: `repeat(${GRID_W}, 1fr)`, aspectRatio: `${GRID_W} / ${GRID_H}` }}>
+          {Array.from({ length: GRID_W * GRID_H }, (_, i) => {
+            const k = `${i % GRID_W},${Math.floor(i / GRID_W)}`
+            const isFood = g.food && k === `${g.food.x},${g.food.y}`
+            return <i key={k} className={cells.has(k) ? (k === headKey ? 'is-head' : 'is-body') : isFood ? 'is-food' : ''} />
+          })}
+          {snakeStatus !== 'playing' && (
+            <div className="lcd-snake-card">
+              <strong>{{ ready: 'Snake', paused: 'Paused', over: 'Game over' }[snakeStatus]}</strong>
+              <span>
+                {snakeStatus === 'over' ? `Score ${g.score}` : snakeStatus === 'ready' ? 'Arrows or 2 4 6 8' : 'Press 5'}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  } else if (screen === 'terminal') {
+    body = (
+      <div className="lcd-term" onClick={() => termInputRef.current?.focus({ preventScroll: true })}>
+        <div className="lcd-term-scroll" ref={termScrollRef}>
+          {termHistory.map((line, i) => (
+            <div key={i} className={line.type === 'input' ? 'is-input' : ''}>{line.text}</div>
+          ))}
+          <label className="lcd-term-prompt">
+            <span>{termCwd}&gt;</span>
+            <input
+              ref={termInputRef}
+              type="text"
+              value={termInput}
+              onChange={(e) => {
+                setTermInput(e.target.value)
+                setActivity((n) => n + 1)
+              }}
+              aria-label="Terminal command"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck="false"
+              enterKeyHint="go"
+            />
+          </label>
+        </div>
+      </div>
+    )
+  } else if (screen === 'dialing' || screen === 'calling') {
+    body = (
+      <div className="lcd-dial">
+        {screen === 'calling' && <span className="lcd-dial-label">Calling</span>}
+        <span className="lcd-dial-number">{dialNumber}</span>
+      </div>
+    )
+  } else if (screen === 'notice' && notice) {
+    body = (
+      <div className="lcd-notice">
+        <strong>{notice.title}</strong>
+        <span>{notice.text}</span>
+      </div>
+    )
+  } else if (screen === 'screensaver') {
+    body = <div className="lcd-saver">{clock}</div>
   }
 
   return (
-    <div 
-      id="nokia-ui-screen-inner"
-      className="w-full h-full flex flex-col text-[2.5cqw] text-[#1a2e0e] bg-transparent p-[1cqw] font-sans"
-      style={{ fontFamily: '"Nokia Cellphone FC", monospace' }}
-    >
-      {/* Top area for time if needed, though usually idle screen has it centered. Let's keep a tiny spacer */}
-      <div className="h-[2cqw] w-full"></div>
-
-      {/* Main Content Area flanked by vertical bars */}
-      <div className="flex-1 flex flex-row overflow-hidden relative">
-        {/* Left Vertical Signal Bar */}
-        {screen !== 'boot' && screen !== 'screensaver' && (
-          <div className="w-[6cqw] flex flex-col items-start py-[1cqw] justify-between h-full pl-[1.5cqw]">
-            <div className="w-[3cqw] h-[3.5cqw] bg-[#1a2e0e]"></div>
-            <div className="w-[2.2cqw] h-[3.5cqw] bg-[#1a2e0e]"></div>
-            <div className="w-[1.5cqw] h-[3.5cqw] bg-[#1a2e0e]"></div>
-            <div className="w-[0.8cqw] h-[3.5cqw] bg-[#1a2e0e]"></div>
-            <svg viewBox="0 0 10 12" className="w-[3.5cqw] h-[4cqw] mt-[0.5cqw] -ml-[1.2cqw]">
-              <path d="M5,12 L5,4 M5,4 L0.5,0 M5,4 L9.5,0" fill="none" stroke="#1a2e0e" strokeWidth="1.5" strokeLinecap="square" />
-            </svg>
-          </div>
-        )}
-
-        {/* Central Content */}
-        <div className="flex-1 flex flex-col overflow-hidden relative px-[1cqw]">
-          {screen === 'idle' && (
-            <div className="flex-1 flex flex-col justify-between py-[1cqw]">
-              {/* Top row */}
-              <div className="flex justify-between items-start w-full px-[1cqw]">
-                {/* Key Icon */}
-                <svg viewBox="0 0 16 16" className="w-[3cqw] h-[3cqw]">
-                  <path d="M5,8 A2,2 0 1,1 5,7.9 M7,8 L15,8 M13,8 L13,11 M15,8 L15,11" fill="none" stroke="#1a2e0e" strokeWidth="1.5" strokeLinecap="square" />
-                </svg>
-                <div className="text-[3cqw] font-bold tracking-widest">{timeStr}</div>
-              </div>
-              
-              {/* Central Graphic */}
-              <div className="flex-1 flex items-center justify-center px-[3cqw]">
-                <img 
-                  src={idleLogo} 
-                  alt="Idle Graphic" 
-                  className="w-full max-h-[12cqw] object-contain filter grayscale contrast-200 opacity-90 mix-blend-multiply" 
-                  style={{ imageRendering: 'pixelated' }} 
-                />
-              </div>
-              
-              {/* Bottom text */}
-              <div className="text-[3cqw] font-bold text-center mt-auto tracking-widest">
-                {PROFILE.operator}
-              </div>
-            </div>
-          )}
-
-          {screen === 'menu' && (
-            <div className="flex-1 flex flex-col mt-[1cqw]">
-              <div className="flex justify-between items-center mb-[1cqw] text-[2.5cqw] border-b-[2px] border-[#1a2e0e] pb-[1cqw] flex-shrink-0 font-bold tracking-wider">
-                <div className="flex items-center gap-[1cqw]">
-                  <span className="opacity-80 scale-x-75">◀</span>
-                  <span>{MENU[menuIdx].label}</span>
-                  <span className="opacity-80 scale-x-75">▶</span>
-                </div>
-                <span>{menuIdx + 1}</span>
-              </div>
-              <div className="flex-1 flex flex-col items-center justify-center px-[4cqw]">
-                <div className="w-[14cqw] h-[14cqw] flex items-center justify-center">
-                  {MENU[menuIdx].icon}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {screen === 'messages' && (
-            <div className="flex-1 flex flex-col min-h-0">
-              <div className="text-[2cqw] border-b-[2px] border-[#1a2e0e] mb-2 pb-2 flex-shrink-0 font-bold">ABOUT ME</div>
-              <div ref={scrollRef} className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative">
-                <div className="w-full">
-                  {PROFILE.about.map((p, i) => <p key={i} className="mb-4 leading-relaxed">{p}</p>)}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {screen === 'contacts' && (
-            <div className="flex-1 flex flex-col min-h-0">
-              <div className="flex justify-between text-[2cqw] font-bold border-b-[2px] border-[#1a2e0e] mb-2 pb-2 flex-shrink-0">
-                <span>CONTACTS</span>
-                <span>{activeItemIdx + 1}/{PROFILE.contacts.length}</span>
-              </div>
-              <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-                <div className="flex flex-col">
-                  {PROFILE.contacts.map((c, i) => (
-                    <div 
-                      key={c.label} 
-                      id={`list-item-${i}`}
-                      onClick={() => { setActiveItemIdx(i); openExternal(c.url); }}
-                      className={`flex justify-between items-center py-4 px-2 cursor-pointer ${i === activeItemIdx ? 'bg-[#1a2e0e] text-[#9dc87a]' : ''}`}
-                    >
-                      <span className="text-[2cqw]">{c.label}</span>
-                      <span className="text-[1.2cqw]">{c.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {screen === 'projects' && (
-            <div className="flex-1 overflow-hidden relative">
-              <div className="absolute top-0 left-0 right-0 bg-[#9dc87a] z-10 font-bold border-b-[2px] border-[#1a2e0e] text-[2.5cqw] px-[1cqw] flex justify-between">
-                <span>Projects</span>
-                <span>{activeItemIdx + 1}/{projects.length}</span>
-              </div>
-              <div className="mt-[4cqw] h-[calc(100%-4cqw)] overflow-y-auto px-[1cqw]" ref={scrollRef}>
-                <div className="flex flex-col space-y-[1.5cqw] pt-[1cqw] pb-[2cqw]">
-                  {projects.map((p, i) => (
-                    <div 
-                      key={p.name} 
-                      id={`list-item-${i}`}
-                      onClick={() => { setActiveItemIdx(i); if (p.url) openExternal(p.url); }}
-                      className={`flex flex-col justify-center py-4 px-2 border-b-[2px] border-[#1a2e0e]/50 cursor-pointer ${i === activeItemIdx ? 'bg-[#1a2e0e] text-[#9dc87a]' : ''}`}
-                    >
-                      <span className="font-bold text-[2cqw]">{p.name}</span>
-                      {p.desc && <span className="text-[1.2cqw] mt-2 leading-loose">{p.desc}</span>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {screen === 'snake' && (
-            <div className="flex-1 flex flex-col items-center justify-center relative w-full h-full">
-              {gameState === 'IDLE' && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-                  <div className="bg-[#9dc87a] border-[0.5cqw] border-[#1a2e0e] rounded-[3cqw] px-[4cqw] py-[2cqw] flex flex-col items-center shadow-lg">
-                    <div className="text-[2.5cqw] mb-2 font-bold">SNAKE</div>
-                    <div className="text-[1.5cqw] opacity-70 mt-2 text-center leading-tight">Press Enter<br/>or Arrows</div>
-                  </div>
-                </div>
-              )}
-              {gameState === 'GAMEOVER' && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center z-10 backdrop-blur-[1px]">
-                  <div className="bg-[#9dc87a] border-[0.5cqw] border-[#1a2e0e] rounded-[3cqw] px-[4cqw] py-[2cqw] flex flex-col items-center shadow-lg">
-                    <div className="text-[2.5cqw] mb-2 font-bold">GAME OVER</div>
-                    <div className="text-[1.5cqw] mb-4">Score: {scoreRef.current}</div>
-                    <div className="text-[1.5cqw] opacity-70">Press Enter</div>
-                  </div>
-                </div>
-              )}
-              <div 
-                className="grid w-full aspect-[1.5] bg-transparent"
-                style={{ 
-                  gridTemplateColumns: `repeat(${gridW}, minmax(0, 1fr))`,
-                  gridTemplateRows: `repeat(${gridH}, minmax(0, 1fr))` 
-                }}
-              >
-                {Array.from({ length: gridH * gridW }).map((_, i) => {
-                  const x = i % gridW;
-                  const y = Math.floor(i / gridW);
-                  const isSnake = snakeRef.current.some(seg => seg.x === x && seg.y === y);
-                  const isFood = foodRef.current.x === x && foodRef.current.y === y;
-                  return (
-                    <div 
-                      key={i} 
-                      className={`w-full h-full border-[0.5px] border-[#1a2e0e]/10 ${isSnake ? 'bg-[#1a2e0e]' : isFood ? 'bg-[#1a2e0e] scale-75 rounded-[1px]' : ''}`}
-                    ></div>
-                  )
-                })}
-              </div>
-              <div className="absolute top-0 right-0 text-[1.5cqw]">Score: {scoreRef.current}</div>
-            </div>
-          )}
-
-          {screen === 'terminal' && (
-            <div className="flex-1 flex flex-col p-[1cqw] overflow-hidden text-[1.5cqw] leading-tight" onClick={() => { const input = document.getElementById('term-input'); if(input) input.focus(); }}>
-              <div className="flex-1 overflow-y-auto break-words whitespace-pre-wrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']" ref={termScrollRef}>
-                {termHistory.map((line, i) => (
-                  <div key={i} className={line.type === 'input' ? 'font-bold mt-[1cqw]' : 'mt-[0.5cqw]'}>
-                    {line.text}
-                  </div>
-                ))}
-                <div className="flex mt-[1cqw] items-center">
-                  <span className="mr-[1cqw] whitespace-nowrap">{termCwd} &gt;</span>
-                  <input 
-                    id="term-input"
-                    type="text" 
-                    autoFocus
-                    value={termInput}
-                    onChange={e => setTermInput(e.target.value)}
-                    onKeyDown={handleTerminalCommand}
-                    autoComplete="off"
-                    autoCorrect="off"
-                    spellCheck="false"
-                    className="flex-1 bg-transparent outline-none border-none text-inherit font-inherit caret-[#1a2e0e] p-0 m-0 shadow-none focus:ring-0 w-full"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right Vertical Battery Bar */}
-        {screen !== 'boot' && screen !== 'screensaver' && (
-          <div className="w-[6cqw] flex flex-col items-end py-[1cqw] justify-between h-full pr-[1.5cqw]">
-            <div className="w-[3cqw] h-[3.5cqw] bg-[#1a2e0e]"></div>
-            <div className="w-[2.2cqw] h-[3.5cqw] bg-[#1a2e0e]"></div>
-            <div className="w-[1.5cqw] h-[3.5cqw] bg-[#1a2e0e]"></div>
-            <div className="w-[0.8cqw] h-[3.5cqw] bg-[#1a2e0e]"></div>
-            <div className="mt-[0.5cqw] -mr-[0.5cqw] flex items-center justify-center">
-              <div className="w-[3cqw] h-[4.5cqw] border-[1.5px] border-[#1a2e0e]"></div>
-            </div>
-          </div>
+    <div className={lcdClass}>
+      <p className="sr-only" aria-live="polite">{srStatus}</p>
+      <div className="lcd-content">
+        <div className="lcd-body">{body}</div>
+        {softLabel && (
+          <button {...noFocus} type="button" className="lcd-soft" onClick={tap('navi')}>
+            {softLabel}
+          </button>
         )}
       </div>
-
-      {screen === 'dialing' && (
-        <div className="w-full h-full flex items-center justify-center p-[2cqw]">
-          <div className="text-[5cqw] font-bold tracking-widest break-all text-center leading-tight">
-            {dialNumber}
-            <span className="animate-pulse">_</span>
-          </div>
-        </div>
-      )}
-
-      {screen === 'screensaver' && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="text-[6cqw] font-bold tracking-widest animate-[bounce_4s_ease-in-out_infinite_alternate]">
-            {timeStr}
-          </div>
-        </div>
-      )}
-
-      {/* Soft keys */}
-      <div className="flex justify-between px-[2cqw] py-[1cqw] border-t-[3px] border-[#1a2e0e] mt-1 text-[2cqw] font-bold">
-        <span 
-          className="cursor-pointer"
-          onClick={() => {
-            if (screen === 'idle') {
-              setScreen('menu')
-              setMenuIdx(0)
-            } else if (screen === 'contacts' && PROFILE.contacts[activeItemIdx]) {
-              openExternal(PROFILE.contacts[activeItemIdx].url)
-            } else if (screen === 'projects' && projects[activeItemIdx]) {
-              if (projects[activeItemIdx].url) {
-                openExternal(projects[activeItemIdx].url)
-              }
-            } else if (screen === 'terminal') {
-              handleTerminalCommand({ key: 'Enter' });
-            } else if (screen === 'dialing') {
-              window.open(`tel:${dialNumber}`, '_self');
-              setScreen('idle');
-              setDialNumber('');
-            } else if (screen === 'menu') {
-              const selected = MENU[menuIdx].id;
-              if (selected === 'github') {
-                openExternal('https://github.com/tanmayhutt');
-                setScreen('idle');
-              } else if (selected === 'instagram') {
-                openExternal('https://www.instagram.com/tanmayhutt/');
-                setScreen('idle');
-              } else if (selected === 'terminal') {
-                handleOpenApp('terminal');
-              } else {
-                handleOpenApp(selected);
-              }
-            }
-          }}
-        >
-          {screen === 'idle' ? 'Menu' : (screen === 'contacts' || screen === 'projects') ? 'Open' : (screen === 'terminal' || screen === 'dialing') ? 'Call' : 'Select'}
-        </span>
-        <span 
-          className="cursor-pointer"
-          onClick={() => {
-            if (screen === 'menu' || screen === 'messages' || screen === 'contacts' || screen === 'projects' || screen === 'snake' || screen === 'terminal') {
-              setScreen('menu')
-            }
-            if (screen === 'dialing') {
-              setDialNumber(prev => {
-                const next = prev.slice(0, -1);
-                if (next.length === 0) setScreen('idle');
-                return next;
-              });
-            } else if (screen === 'menu' && menuIdx === 0) {
-              setScreen('idle')
-            } else {
-              setScreen('idle')
-            }
-          }}
-        >
-          {screen === 'idle' ? 'Names' : 'Back'}
-        </span>
-      </div>
+      <div className="lcd-pixels" aria-hidden="true" />
+      <div className="lcd-glow" aria-hidden="true" />
     </div>
   )
 }
